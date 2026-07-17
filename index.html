@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retail Robot · Product Recommendation Demo</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b26; --panel-2:#1d2430; --line:#2a3342;
+    --ink:#e8edf5; --ink-2:#a7b2c4; --muted:#6f7d92;
+    --brand:#4f8cff; --brand-ink:#bcd4ff; --accent:#ff8a4c;
+    --good:#33c07f; --warn:#f0b04a; --bad:#ff6b6b;
+    --user:#274168; --bot:#1e2734;
+    --radius:14px; --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:var(--sans); color:var(--ink); background:
+      radial-gradient(1200px 600px at 20% -10%, #1a2540 0%, transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, #241a33 0%, transparent 55%), var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  header.top{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(22,27,38,.9),rgba(22,27,38,.6));backdrop-filter:blur(6px);position:sticky;top:0;z-index:5;}
+  .logo{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--brand),#7a5cff);font-size:20px;box-shadow:0 6px 18px -8px var(--brand);}
+  .top h1{font-size:1.02rem;margin:0;font-weight:700;letter-spacing:.2px;}
+  .top .sub{font-size:.76rem;color:var(--ink-2);margin-top:1px;}
+  .top .spacer{flex:1;}
+  .knobs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.74rem;color:var(--ink-2);}
+  .knob{display:flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);padding:5px 9px;border-radius:999px;}
+  .knob select{background:transparent;color:var(--ink);border:none;font:inherit;outline:none;cursor:pointer;}
+  .badge{font-size:.74rem;color:var(--good);background:rgba(51,192,127,.1);border:1px solid rgba(51,192,127,.35);padding:5px 11px;border-radius:999px;}
+  .settings{max-width:1240px;margin:0 auto;padding:14px 18px;display:flex;flex-direction:column;gap:9px;
+    border-bottom:1px solid var(--line);background:rgba(29,36,48,.5);}
+  .settings .srow{display:flex;align-items:center;gap:10px;font-size:.82rem;color:var(--ink-2);}
+  .settings .srow label{width:150px;flex:none;}
+  .settings .srow .opt{color:var(--muted);}
+  .settings input,.settings select{flex:1;max-width:520px;background:var(--bg);border:1px solid var(--line);border-radius:8px;
+    padding:8px 11px;color:var(--ink);font:inherit;outline:none;}
+  .settings input:focus{border-color:var(--brand);}
+  .snote{font-size:.74rem;color:var(--muted);line-height:1.5;}
+  .snote code{background:var(--panel-2);padding:1px 5px;border-radius:5px;color:var(--brand-ink);font-size:.72rem;}
+  .snote button{margin-left:6px;background:none;border:1px solid var(--line);color:var(--ink-2);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.72rem;}
+  .snote button:hover{color:var(--bad);border-color:var(--bad);}
+  .bub .err{color:var(--bad);font-size:.86rem;}
+
+  .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;max-width:1240px;margin:0 auto;padding:18px 18px 28px;}
+  @media(max-width:920px){ .wrap{grid-template-columns:1fr;} }
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .card > .hd{padding:11px 15px;border-bottom:1px solid var(--line);font-size:.74rem;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--ink-2);display:flex;align-items:center;gap:8px;background:var(--panel-2);}
+  .hd .dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(51,192,127,.15);}
+  .langsw{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .langsw button{background:transparent;border:none;color:var(--ink-2);font:inherit;font-size:.72rem;padding:3px 10px;cursor:pointer;letter-spacing:0;}
+  .langsw button.on{background:var(--brand);color:#fff;}
+
+  .chat{display:flex;flex-direction:column;height:min(74vh,700px);}
+  .msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:11px;}
+  .row{display:flex;gap:9px;max-width:88%;}
+  .row.user{align-self:flex-end;flex-direction:row-reverse;}
+  .av{width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;font-size:15px;}
+  .av.bot{background:linear-gradient(135deg,var(--brand),#7a5cff);}
+  .av.user{background:var(--user);}
+  .bub{padding:10px 13px;border-radius:13px;font-size:.92rem;line-height:1.5;border:1px solid var(--line);}
+  .row.bot .bub{background:var(--bot);border-top-left-radius:4px;}
+  .row.user .bub{background:var(--user);border-top-right-radius:4px;}
+  .bub .rec{margin-top:8px;padding:9px 11px;border-radius:10px;background:rgba(79,140,255,.1);border:1px solid rgba(79,140,255,.35);display:flex;gap:10px;align-items:center;}
+  .bub .rec .nm{font-weight:700;color:var(--brand-ink);}
+  .bub .rec .px{font-size:.76rem;color:var(--ink-2);}
+  .bub ol{margin:8px 0 4px;padding-left:20px;} .bub ol li{margin:3px 0;}
+  .bub .plan{margin-top:8px;font-size:.82rem;color:var(--ink-2);border-left:2px solid var(--good);padding-left:10px;}
+  .bub .plan b{color:var(--good);}
+  .bub .typing span{display:inline-block;width:6px;height:6px;margin:0 1px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite both;}
+  .bub .typing span:nth-child(2){animation-delay:.2s;} .bub .typing span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
+  .bub .caret{display:inline-block;margin-left:1px;color:var(--muted);animation:blink 1s infinite;}
+
+  .composer{border-top:1px solid var(--line);padding:11px;display:flex;flex-direction:column;gap:9px;background:var(--panel-2);}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;}
+  .chip{font-size:.76rem;color:var(--brand-ink);background:rgba(79,140,255,.1);border:1px solid rgba(79,140,255,.3);padding:5px 10px;border-radius:999px;cursor:pointer;transition:.15s;}
+  .chip:hover{background:rgba(79,140,255,.22);}
+  .inrow{display:flex;gap:9px;}
+  .inrow input{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:11px 13px;color:var(--ink);font:inherit;outline:none;}
+  .inrow input:focus{border-color:var(--brand);}
+  .inrow button{background:linear-gradient(135deg,var(--brand),#6d7bff);border:none;color:#fff;font-weight:700;padding:0 18px;border-radius:11px;cursor:pointer;font-size:.9rem;}
+  .inrow button:active{transform:translateY(1px);}
+  .reset{background:none;border:1px solid var(--line);color:var(--ink-2);border-radius:11px;padding:0 13px;cursor:pointer;}
+
+  .right{display:flex;flex-direction:column;gap:16px;}
+  .reason{font-family:var(--mono);font-size:.8rem;padding:14px 15px;line-height:1.6;min-height:110px;}
+  .statebar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:11px 15px;border-bottom:1px solid var(--line);background:var(--panel-2);}
+  .pill{font-family:var(--mono);font-size:.7rem;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--ink-2);}
+  .pill.on{background:rgba(79,140,255,.18);border-color:var(--brand);color:var(--brand-ink);}
+  .arrow{color:var(--muted);font-size:.7rem;}
+  .rk{color:var(--muted);} .rv{color:var(--ink);}
+  .tag{color:var(--brand-ink);} .ex{color:var(--bad);} .ok{color:var(--good);} .cand{color:var(--accent);}
+  .reason .ln{white-space:pre-wrap;} .placeholder{color:var(--muted);font-style:italic;}
+
+  /* session: memory + cart */
+  .session{padding:12px 14px;display:flex;flex-direction:column;gap:11px;}
+  .seclabel{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  .prefrow{display:flex;gap:6px;flex-wrap:wrap;min-height:22px;}
+  .pref{font-size:.72rem;color:var(--accent);background:rgba(255,138,76,.1);border:1px solid rgba(255,138,76,.35);padding:3px 9px;border-radius:999px;}
+  .pref.none{color:var(--muted);background:none;border-color:var(--line);}
+  .cartlist{display:flex;flex-direction:column;gap:6px;}
+  .cartitem{display:flex;align-items:center;gap:8px;font-size:.84rem;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:6px 10px;}
+  .cartitem .q{font-weight:800;color:var(--brand-ink);min-width:26px;}
+  .cartitem .nm{flex:1;line-height:1.2;}
+  .cartitem .rm{cursor:pointer;color:var(--muted);border:none;background:none;font-size:1rem;line-height:1;}
+  .cartitem .rm:hover{color:var(--bad);}
+  .cartempty{font-size:.8rem;color:var(--muted);font-style:italic;}
+  .cartbar{display:flex;align-items:center;gap:10px;margin-top:2px;}
+  .cartbar .tot{font-size:.8rem;color:var(--ink-2);flex:1;}
+  .checkout{background:linear-gradient(135deg,var(--good),#2aa06a);border:none;color:#04120b;font-weight:800;padding:8px 14px;border-radius:9px;cursor:pointer;font-size:.82rem;}
+  .checkout:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4);}
+
+  .inv{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:320px;overflow-y:auto;}
+  @media(max-width:520px){ .inv{grid-template-columns:1fr;} }
+  .p{border:1px solid var(--line);border-radius:11px;padding:10px 11px;background:var(--panel-2);transition:.18s;position:relative;}
+  .p.dim{opacity:.32;filter:saturate(.5);}
+  .p.hit{border-color:var(--brand);box-shadow:0 0 0 2px rgba(79,140,255,.35);background:rgba(79,140,255,.08);}
+  .p.rec{border-color:var(--good);box-shadow:0 0 0 2px rgba(51,192,127,.45);}
+  .p .nm{font-size:.82rem;font-weight:700;line-height:1.25;}
+  .p .cat{font-size:.68rem;color:var(--muted);margin:2px 0 7px;}
+  .p .attrs{display:flex;gap:5px;flex-wrap:wrap;}
+  .b{font-size:.64rem;padding:2px 6px;border-radius:5px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap;}
+  .b.fn{color:var(--brand-ink);border-color:rgba(79,140,255,.4);background:rgba(79,140,255,.08);}
+  .b.sw{color:var(--accent);} .b.st{color:var(--good);}
+  .sweet{display:inline-flex;gap:2px;vertical-align:middle;} .sweet i{width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.28;} .sweet i.f{opacity:1;}
+  .recflag{position:absolute;top:-8px;right:8px;font-size:.6rem;background:var(--good);color:#04120b;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:.05em;}
+  .qbadge{position:absolute;top:-8px;left:8px;font-size:.6rem;background:var(--brand);color:#fff;font-weight:800;padding:2px 7px;border-radius:999px;}
+  .legend{font-size:.68rem;color:var(--muted);padding:0 14px 12px;display:flex;gap:14px;flex-wrap:wrap;}
+  .legend b{color:var(--ink-2);font-weight:600;}
+  .foot{max-width:1240px;margin:0 auto;padding:2px 20px 30px;color:var(--muted);font-size:.74rem;line-height:1.6;}
+  .foot code{background:var(--panel-2);padding:1px 5px;border-radius:5px;color:var(--brand-ink);font-size:.72rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card chat">
+    <div class="hd"><span class="dot"></span> <span id="t-chat">Chatbot</span>
+      <span style="flex:1"></span>
+      <span class="langsw"><button id="lang-en" class="on">EN</button><button id="lang-zh">中文</button></span>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="composer">
+      <div class="chips" id="chips"></div>
+      <div class="inrow">
+        <input id="in" autocomplete="off" placeholder="Tell the robot what you feel like…">
+        <button id="send">Send</button>
+        <button class="reset" id="reset" title="Restart conversation">↺</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="right">
+    <section class="card">
+      <div class="statebar" id="statebar"></div>
+      <div class="hd" style="border-top:1px solid var(--line)"><span class="dot" style="background:var(--accent);box-shadow:0 0 0 3px rgba(255,138,76,.15)"></span> <span id="t-reason">Reasoning · scratchpad</span></div>
+      <div class="reason" id="reason"><span class="placeholder">The bot's need → function → constraints → candidates reasoning shows here each turn.</span></div>
+    </section>
+
+    <section class="card">
+      <div class="hd"><span class="dot" style="background:var(--brand);box-shadow:0 0 0 3px rgba(79,140,255,.15)"></span> <span id="t-session">Session memory &amp; cart</span></div>
+      <div class="session">
+        <div><div class="seclabel" id="t-prefs">Standing preferences (remembered)</div><div class="prefrow" id="prefs"></div></div>
+        <div><div class="seclabel" id="t-cartlabel">Cart</div><div class="cartlist" id="cart"></div>
+          <div class="cartbar"><span class="tot" id="carttot"></span><button class="checkout" id="checkout">Check out</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="hd"><span class="dot"></span> <span id="t-inv">Store inventory</span> <span style="flex:1"></span><span id="invcount" style="color:var(--muted)"></span></div>
+      <div class="inv" id="inv"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+/* ===================== CATALOG (from catalog.json) ===================== */
+const DATA = {
+  "products":[
+    {id:"evian_natural_mineral_water",name:"Evian Natural Mineral Water",category:"Mineral Water",function_tags:["hydration"],flavor:"",sweetness:0,sugar_level:"none",calories_kcal:0,served:"chilled",caffeine:false,keywords:["water","plain water","not sweet","hydration","thirsty","still water","mineral water","sugar-free","healthy","evian"],blurb:"If you just want something clean and refreshing, Evian is pure natural mineral water with zero sugar.",in_stock:true,qty:12,location:{turn_direction:"L",height_level:"None"}},
+    {id:"nongfu_spring_orange_juice",name:"Nongfu Spring NFC Orange Juice",category:"NFC Juice",function_tags:["fruit_refreshment","hydration"],flavor:"orange",sweetness:4,sugar_level:"high",calories_kcal:110,served:"chilled",caffeine:false,keywords:["juice","orange","fruity","sweet","refreshing","fruit juice","nfc","vitamin c","flavourful","nongfu"],blurb:"Craving something fruity? This NFC orange juice is pressed from real oranges for a bright, sweet lift.",in_stock:true,qty:8,location:{turn_direction:"L",height_level:"None"}},
+    {id:"nongfu_spring_guava_blend_juice",name:"Nongfu Spring NFC Guava Blend Juice",category:"NFC Juice",function_tags:["fruit_refreshment","hydration"],flavor:"guava blend",sweetness:4,sugar_level:"high",calories_kcal:115,served:"chilled",caffeine:false,keywords:["juice","guava","tropical","fruity","sweet","refreshing","fruit juice","nfc","flavourful","nongfu"],blurb:"For a tropical twist, this NFC guava blend is smooth, sweet, and packed with real fruit flavour.",in_stock:true,qty:7,location:{turn_direction:"L",height_level:"None"}},
+    {id:"nongfu_spring_mango_juice",name:"Nongfu Spring NFC Mango Juice",category:"NFC Juice",function_tags:["fruit_refreshment","hydration"],flavor:"mango",sweetness:4,sugar_level:"high",calories_kcal:120,served:"chilled",caffeine:false,keywords:["juice","mango","tropical","fruity","sweet","refreshing","fruit juice","nfc","flavourful","nongfu"],blurb:"Sweet and sunny — this NFC mango juice tastes like ripe mango straight from the fruit.",in_stock:true,qty:7,location:{turn_direction:"L",height_level:"None"}},
+    {id:"electro_grape_jasmine",name:"Electrolyte Water — Grape & Jasmine",category:"Electrolyte Water",function_tags:["rehydration_electrolytes","hydration"],flavor:"grape & jasmine",sweetness:2,sugar_level:"low",calories_kcal:25,served:"chilled",caffeine:false,keywords:["post-workout","electrolyte","recovery","not sweet","refreshing","sweat","cramps","hangover","rehydrate","sports","low sugar","grape"],blurb:"Been sweating it out? This lightly grape-jasmine electrolyte water rehydrates and replaces the salts you lost.",in_stock:true,qty:10,location:{turn_direction:"L",height_level:"None"}},
+    {id:"electro_white_grape_jasmine",name:"Electrolyte Water — White Grape & Jasmine",category:"Electrolyte Water",function_tags:["rehydration_electrolytes","hydration"],flavor:"white grape & jasmine",sweetness:1,sugar_level:"low",calories_kcal:25,served:"chilled",caffeine:false,keywords:["post-workout","electrolyte","recovery","not sweet","refreshing","sweat","cramps","hangover","rehydrate","sports","low sugar","white grape"],blurb:"A crisp white-grape-and-jasmine electrolyte water — barely sweet and perfect for bouncing back after a workout.",in_stock:true,qty:10,location:{turn_direction:"L",height_level:"None"}},
+    {id:"electro_pomegranate",name:"Electrolyte Water — Pomegranate",category:"Electrolyte Water",function_tags:["rehydration_electrolytes","hydration"],flavor:"pomegranate",sweetness:2,sugar_level:"low",calories_kcal:28,served:"chilled",caffeine:false,keywords:["post-workout","electrolyte","recovery","not sweet","refreshing","sweat","cramps","hangover","rehydrate","sports","low sugar","pomegranate"],blurb:"This subtly pomegranate electrolyte water is a light, low-sugar way to rehydrate and top up your salts.",in_stock:true,qty:9,location:{turn_direction:"L",height_level:"None"}},
+    {id:"electro_sunshine_pomegranate",name:"Electrolyte Water — Sunshine Pomegranate",category:"Electrolyte Water",function_tags:["rehydration_electrolytes","hydration"],flavor:"sunshine pomegranate",sweetness:2,sugar_level:"low",calories_kcal:28,served:"chilled",caffeine:false,keywords:["post-workout","electrolyte","recovery","not sweet","refreshing","sweat","cramps","hangover","rehydrate","sports","low sugar","pomegranate"],blurb:"Sunshine pomegranate electrolyte water — gently fruity, low in sugar, and made to help you recover after a sweat.",in_stock:true,qty:9,location:{turn_direction:"L",height_level:"None"}},
+    {id:"black_blind_box",name:"Black Blind Box",category:"Blind Box",function_tags:["gift_novelty"],flavor:"black",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["blind box","surprise","collectible","gift","fun","novelty","mystery","toy","black"],blurb:"Feeling lucky? Crack open this black blind box for a fun little collectible surprise.",in_stock:true,qty:6,location:{turn_direction:"B",height_level:"None"}},
+    {id:"green_blind_box",name:"Green Blind Box",category:"Blind Box",function_tags:["gift_novelty"],flavor:"green",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["blind box","surprise","collectible","gift","fun","novelty","mystery","toy","green"],blurb:"This green blind box hides a mystery figure — a playful little gift or treat-yourself pick.",in_stock:true,qty:6,location:{turn_direction:"B",height_level:"None"}},
+    {id:"purple_blind_box",name:"Purple Blind Box",category:"Blind Box",function_tags:["gift_novelty"],flavor:"purple",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["blind box","surprise","collectible","gift","fun","novelty","mystery","toy","purple"],blurb:"Not sure what's inside? That's the fun — this purple blind box is a surprise collectible.",in_stock:true,qty:5,location:{turn_direction:"B",height_level:"None"}},
+    {id:"pink_blind_box",name:"Pink Blind Box",category:"Blind Box",function_tags:["gift_novelty"],flavor:"pink",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["blind box","surprise","collectible","gift","fun","novelty","mystery","toy","pink"],blurb:"This pink blind box makes a cute surprise gift — you won't know which figure you got until you open it.",in_stock:true,qty:5,location:{turn_direction:"B",height_level:"None"}},
+    {id:"orange_blind_box",name:"Orange Blind Box",category:"Blind Box",function_tags:["gift_novelty"],flavor:"orange",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["blind box","surprise","collectible","gift","fun","novelty","mystery","toy","orange"],blurb:"Grab this orange blind box for a cheerful surprise — a great little pick-me-up or gift.",in_stock:true,qty:5,location:{turn_direction:"B",height_level:"None"}},
+    {id:"gareer_guide_purple",name:"Gareer Guide Collectible — Purple",category:"Collectible",function_tags:["gift_novelty"],flavor:"purple",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["collectible","gift","novelty","figure","gareer guide","purple","fun","keepsake"],blurb:"The purple Gareer Guide is a fun collectible to add to your set or give as a little gift.",in_stock:true,qty:4,location:{turn_direction:"B",height_level:"None"}},
+    {id:"gareer_guide_green",name:"Gareer Guide Collectible — Green",category:"Collectible",function_tags:["gift_novelty"],flavor:"green",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["collectible","gift","novelty","figure","gareer guide","green","fun","keepsake"],blurb:"Green Gareer Guide — a charming collectible that makes a great surprise or keepsake.",in_stock:true,qty:4,location:{turn_direction:"B",height_level:"None"}},
+    {id:"gareer_guide_black",name:"Gareer Guide Collectible — Black",category:"Collectible",function_tags:["gift_novelty"],flavor:"black",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["collectible","gift","novelty","figure","gareer guide","black","fun","keepsake"],blurb:"The sleek black Gareer Guide is a collectible favourite — perfect for gifting or completing your set.",in_stock:true,qty:4,location:{turn_direction:"B",height_level:"None"}},
+    {id:"gareer_guide_orange",name:"Gareer Guide Collectible — Orange",category:"Collectible",function_tags:["gift_novelty"],flavor:"orange",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["collectible","gift","novelty","figure","gareer guide","orange","fun","keepsake"],blurb:"Bright and cheerful, the orange Gareer Guide is a fun collectible or a thoughtful little gift.",in_stock:true,qty:4,location:{turn_direction:"B",height_level:"None"}},
+    {id:"gareer_guide_pink",name:"Gareer Guide Collectible — Pink",category:"Collectible",function_tags:["gift_novelty"],flavor:"pink",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["collectible","gift","novelty","figure","gareer guide","pink","fun","keepsake"],blurb:"The pink Gareer Guide is an adorable collectible that makes a sweet surprise gift.",in_stock:true,qty:4,location:{turn_direction:"B",height_level:"None"}},
+    {id:"gareer_guide_blue",name:"Gareer Guide Collectible — Blue",category:"Collectible",function_tags:["gift_novelty"],flavor:"blue",sweetness:0,sugar_level:"none",calories_kcal:0,served:"ambient",caffeine:false,keywords:["collectible","gift","novelty","figure","gareer guide","blue","fun","keepsake"],blurb:"The blue Gareer Guide rounds out the set — a fun collectible to keep or give away.",in_stock:true,qty:4,location:{turn_direction:"B",height_level:"None"}},
+    {id:"ice_cream",name:"Ice Cream",category:"Ice Cream",function_tags:["treat_dessert"],flavor:"vanilla",sweetness:5,sugar_level:"high",calories_kcal:210,served:"frozen",caffeine:false,keywords:["ice cream","dessert","sweet","cold","frozen","treat","indulgent","creamy","vanilla"],blurb:"Want to treat yourself? This cold, creamy ice cream is the perfect sweet indulgence.",in_stock:true,qty:8,location:{turn_direction:"R",height_level:"None"},execution_task_type:"pick_ice_cream"}
+  ]
+};
+const CATALOG = DATA.products;
+
+/* ===================== i18n (English / 中文) ===================== */
+let LANG="en";
+let LANG_SOURCE="auto"; // "manual" when the user explicitly chose EN/中文, otherwise auto-detect from the input
+const zh=()=>LANG==="zh";
+const byId=id=>CATALOG.find(p=>p.id===id);
+const ZH_NAME={evian_natural_mineral_water:"依云矿泉水",nongfu_spring_orange_juice:"农夫山泉 NFC 橙汁",nongfu_spring_guava_blend_juice:"农夫山泉 NFC 番石榴混合汁",nongfu_spring_mango_juice:"农夫山泉 NFC 芒果汁",electro_grape_jasmine:"电解质水 · 葡萄茉莉",electro_white_grape_jasmine:"电解质水 · 白葡萄茉莉",electro_pomegranate:"电解质水 · 石榴",electro_sunshine_pomegranate:"电解质水 · 阳光石榴",black_blind_box:"黑色盲盒",green_blind_box:"绿色盲盒",purple_blind_box:"紫色盲盒",pink_blind_box:"粉色盲盒",orange_blind_box:"橙色盲盒",gareer_guide_purple:"Gareer 收藏摆件 · 紫色",gareer_guide_green:"Gareer 收藏摆件 · 绿色",gareer_guide_black:"Gareer 收藏摆件 · 黑色",gareer_guide_orange:"Gareer 收藏摆件 · 橙色",gareer_guide_pink:"Gareer 收藏摆件 · 粉色",gareer_guide_blue:"Gareer 收藏摆件 · 蓝色",ice_cream:"冰淇淋"};
+const ZH_CAT={"Mineral Water":"矿泉水","NFC Juice":"NFC 果汁","Electrolyte Water":"电解质水","Blind Box":"盲盒","Collectible":"收藏摆件","Ice Cream":"冰淇淋"};
+const ZH_SUG={none:"无糖",low:"低糖",medium:"中糖",high:"高糖"};
+const ZH_SERV={chilled:"冷藏",frozen:"冷冻",ambient:"常温"};
+const ZH_FN={hydration:"补水",rehydration_electrolytes:"电解质",fruit_refreshment:"果味",treat_dessert:"甜点",gift_novelty:"礼物"};
+const DIRW={L:"left",R:"right",B:"back",F:"front",None:"no turn"};
+const DIRW_ZH={L:"左",R:"右",B:"后",F:"前",None:"不"};
+function pname(p){return zh()?(ZH_NAME[p.id]||p.name):p.name;}
+function pcat(p){return zh()?(ZH_CAT[p.category]||p.category):p.category;}
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
+const L=()=>LX[LANG];
+const LX={
+  en:{
+    ui:{chat:"Chatbot",reason:"Reasoning · scratchpad",session:"Session memory & cart",prefs:"Standing preferences (remembered)",cart:"Cart",checkout:"Check out",inv:"Store inventory",send:"Send",placeholder:"Tell the robot what you feel like…",empty:"Empty",noneYet:"None yet",reasonPlaceholder:"The bot's need → function → constraints → candidates reasoning shows here each turn.",
+      skus:n=>`${n} SKUs`,tot:(l,u)=>`${l} line${l>1?"s":""} · ${u} unit${u>1?"s":""}`,
+      legend:["<b>Highlighted</b> = matches need","<b>Green</b> = recommended","<b>Blue badge</b> = in cart","<b>Dim</b> = filtered out"],
+      prefAvoid:"Avoids sweet",prefLike:"Likes sweet",prefNoCaf:"Caffeine-free",inCart:n=>`×${n} in cart`,
+      ollLabel:"In-browser AI",ollHint:'Runs in your browser via WebGPU; downloads a ~1 GB model on first use. Needs Chrome/Edge or Safari 17+.',
+      ollNote:'🧠 In-browser AI mode (WebGPU). The first off-script message downloads a ~1 GB model, then caches it. If your browser can\'t run it, I\'ll fall back to the offline engine.',
+      llmErr:"The in-browser AI hit a snag — the offline assistant will take it from here:",
+      noWebGPU:"This browser can't run the in-browser AI (it needs WebGPU — try Chrome, Edge, or Safari 17+). The offline assistant will help instead:",
+      foot:'Powered by an <b>in-browser LLM</b> (WebLLM · WebGPU) — no cloud, no key, no install. The rule engine answers offline; the model loads on first use. Action schema in <code>ENGINE.md</code>.'},
+    chips:["Just smashed a gym session, nothing sugary","Surprise me","Something fruity for my mate","The pink one instead","No juice, just water","That's all, check me out"],
+    greet:()=>pick(["Hi! I'm the store assistant. What are you in the mood for today? 🥤","Hey there! What can I get you today? 🥤","Welcome! Thirsty, peckish, or after a little gift? 🥤"]),
+    qIdentify:"Happy to help! Are you after something to hydrate, a fruity pick-me-up, a sweet treat, or a gift?",
+    qSweet:"How sweet would you like it — not sweet, a little, or nice and sweet?",
+    pair:pair=>{const s=new Set(pair);return s.has("gift_novelty")?"Is this for yourself, or a gift / something fun to give?":s.has("treat_dessert")?"Something to drink and quench your thirst, or more of a dessert-style treat?":s.has("fruit_refreshment")?"Would you like a plain, replenishing water, or something fruity and flavoured?":"What matters most — hydration, flavour, or a treat?";},
+    noMatch:"Sorry — I couldn't find something in stock that fits. Want to try a different kind of drink or treat?",
+    cartEmptyElicit:"Your cart's empty — what would you like?",
+    added:(name,qty,capped)=>`${pick(["Done —","Nice —","Got it —"])} <b>${esc(name)}</b> ×${qty} in the cart.${capped?" (that's all we have in stock)":""} ${pick(["Anything else, or shall I check you out?","Want anything else, or ready to check out?","Add anything else?"])}`,
+    removed:name=>`${pick(["Removed","Took out"])} <b>${esc(name)}</b>. Anything else?`,
+    options:list=>`Here are a few options:<ol>${list.map(p=>`<li><b>${esc(pname(p))}</b> — ${cap(p.sugar_level)} sugar, ${cap(p.served)}</li>`).join("")}</ol>Which one — you can say "the first" or name it.`,
+    planRow:(dir,qty,ett,name)=>`<div>Turn <b>${dir}</b> → pick <b>×${qty}</b>${ett?` <span style="color:var(--accent)">(${ett} BT)</span>`:""} · ${esc(name)}</div>`,
+    checkout:(units,plan)=>`${pick(["Great —","Perfect —","All set —"])} that's <b>${units} item${units>1?"s":""}</b>. Here's the pick plan for the robot:<div class="plan">${plan}</div><div style="margin-top:8px">Order placed — please wait a moment. 🤖 Anything else I can help with?</div>`,
+    askMore:p=>`It's ${p.sweetness===0?"not sweet at all":p.sweetness<=2?"barely sweet":p.sweetness<=3?"moderately sweet":"quite sweet"}, ${p.sugar_level} sugar, served ${p.served}${p.caffeine?"":", caffeine-free"} (${p.calories_kcal} kcal). Shall I get it for you?`,
+    askAbout:(p,topic)=>{
+      const serv=p.served==="chilled"?"served chilled":p.served==="frozen"?"served frozen":"kept at room temperature";
+      const swd=p.sweetness===0?"not sweet at all":p.sweetness<=2?"only lightly sweet":p.sweetness<=3?"moderately sweet":"quite sweet";
+      const body=({sweet:`It's ${swd} — ${p.sugar_level} sugar (${p.sweetness}/5).`,temp:`It's ${serv}.`,caffeine:p.caffeine?"Yes, it's caffeinated.":"No, it's caffeine-free.",calories:p.calories_kcal>0?`About ${p.calories_kcal} kcal.`:"It has zero calories.",ingredients:p.blurb,stock:`I've got ${p.qty} in stock.`})[topic]||p.blurb;
+      const ask=C.cart.length?pick(["Want me to add it?","Add it to the cart?"]):pick(["Shall I get one for you?","Want me to grab it?"]);
+      return `${body} ${ask}`;},
+    thanks:()=>pick(["You're welcome! Anything else? 😊","Anytime! Want anything else?","No worries — anything else I can get you?"]),
+    thanksPost:()=>pick(["You're welcome! Anything else, or shall I check you out?","Anytime! Add anything else, or ready to check out?"]),
+    help:'I\'ve got <b>drinks</b> — plain water, NFC fruit juices, and light electrolyte waters — a <b>frozen treat</b> (ice cream), and <b>gifts</b> (blind boxes &amp; collectibles). What sounds good? You can also just say <i>"surprise me"</i>.',
+    noCaffeine:"Sorry, we don't stock anything caffeinated at the moment. A chilled juice or a light electrolyte water still makes a refreshing pick-me-up, though — what sounds good?",
+    greetReply:()=>pick(["Hey! What are you after — a drink, a treat, or a gift? 🥤","Hi there! Thirsty, or in the mood for something sweet or fun?","Hello! Tell me what you feel like and I'll sort you out."]),
+    exit:hadCart=>hadCart?"No problem — I've cleared the cart. Come back anytime! 👋":"Come back anytime! 👋",
+    fallback:()=>pick(["Sorry, could you say that another way?","Hmm, I didn't quite catch that — a drink, a treat, or a gift?"]),
+    offer:(p,f,notSweet,inCart)=>{const lead=notSweet?pick(["Since you'd rather skip the sugar, ","No sugar rush here — "]):f==="rehydration_electrolytes"?pick(["Since you've been working hard, ","Perfect for bouncing back — "]):f==="treat_dessert"?pick(["For a little treat, ","Time to spoil yourself — "]):f==="gift_novelty"?pick(["For something fun to give, ","A great little surprise — "]):f==="fruit_refreshment"?pick(["If you're after something fruity, ","For a bright, fruity pick — "]):pick(["Good call — ","Here's a solid pick — "]);const ask=pick(inCart?["Want me to add it?","Add it to the cart?","Shall I pop it in?"]:["Shall I get one for you?","Want me to grab it?","Sound good?"]);return {pre:lead+p.blurb,ask};}
+  },
+  zh:{
+    ui:{chat:"聊天机器人",reason:"推理 · 草稿",session:"会话记忆与购物车",prefs:"记住的偏好",cart:"购物车",checkout:"结账",inv:"门店库存",send:"发送",placeholder:"告诉机器人你想要点什么…",empty:"空",noneYet:"暂无",reasonPlaceholder:"机器人每一轮的推理（需求 → 功能 → 约束 → 候选）都会显示在这里。",
+      skus:n=>`${n} 个 SKU`,tot:(l,u)=>`${l} 项 · ${u} 件`,
+      legend:["<b>高亮</b> = 匹配需求","<b>绿框</b> = 已推荐","<b>蓝标</b> = 在购物车","<b>灰色</b> = 已过滤"],
+      prefAvoid:"不喜甜",prefLike:"喜欢甜",prefNoCaf:"无咖啡因",inCart:n=>`已加 ×${n}`,
+      ollLabel:"浏览器内 AI",ollHint:'在浏览器中通过 WebGPU 运行，首次使用会下载约 1 GB 模型。需 Chrome/Edge 或 Safari 17+。',
+      ollNote:'🧠 浏览器内 AI 模式（WebGPU）。首次遇到规则无法处理的消息时会下载约 1 GB 模型并缓存。若浏览器无法运行，将回退到离线引擎。',
+      llmErr:"浏览器内 AI 出了点问题 —— 交给离线助手继续：",
+      noWebGPU:"当前浏览器无法运行浏览器内 AI（需要 WebGPU —— 请用 Chrome、Edge 或 Safari 17+）。改由离线助手协助：",
+      foot:'由<b>浏览器内大模型</b>（WebLLM · WebGPU）驱动 —— 无云端、无密钥、无需安装。规则引擎离线应答，模型首次使用时加载。动作模式见 <code>ENGINE.md</code>。'},
+    chips:["刚健身完，不要太甜","随便帮我推荐一个","来点果味的送朋友","换粉色那个","不要果汁，就要水","就这些，结账吧"],
+    greet:()=>pick(["你好！我是门店助手，今天想来点什么呢？🥤","嗨！今天想喝点或吃点什么？🥤","欢迎！口渴、嘴馋，还是想挑个小礼物？🥤"]),
+    qIdentify:"乐意效劳！你是想补水解渴、来点果味饮料、甜点，还是挑个礼物呢？",
+    qSweet:"想要多甜呢 —— 不甜、微甜，还是甜一点？",
+    pair:pair=>{const s=new Set(pair);return s.has("gift_novelty")?"是自己用，还是想挑个礼物 / 好玩的送人？":s.has("treat_dessert")?"想喝点解渴的，还是更想来点甜品？":s.has("fruit_refreshment")?"想要清爽的白水，还是果味饮料？":"你更看重哪一点 —— 补水、口味，还是甜点？";},
+    noMatch:"抱歉，暂时没有完全合适的现货。要不要换一类饮料或甜点试试？",
+    cartEmptyElicit:"购物车是空的 —— 想来点什么呢？",
+    added:(name,qty,capped)=>`${pick(["好啦 ——","没问题 ——","收到 ——"])} <b>${esc(name)}</b> ×${qty} 已加入购物车。${capped?"（库存只有这么多了）":""} ${pick(["还要别的吗，还是现在结账？","要不要再加点，或者结账？","还需要点什么吗？"])}`,
+    removed:name=>`已${pick(["移除","去掉"])} <b>${esc(name)}</b>。还要别的吗？`,
+    options:list=>`给你几个选择：<ol>${list.map(p=>`<li><b>${esc(pname(p))}</b> —— ${ZH_SUG[p.sugar_level]}、${ZH_SERV[p.served]}</li>`).join("")}</ol>要哪一个？可以说"第一个"或直接说名字。`,
+    planRow:(dir,qty,ett,name)=>`<div>向<b>${dir}</b>转 → 抓取 <b>×${qty}</b>${ett?` <span style="color:var(--accent)">（${ett} 行为树）</span>`:""} · ${esc(name)}</div>`,
+    checkout:(units,plan)=>`${pick(["好嘞 ——","完美 ——","搞定 ——"])} 一共 <b>${units} 件</b>。这是机器人的抓取计划：<div class="plan">${plan}</div><div style="margin-top:8px">订单已下达，请稍候。🤖 还需要我帮忙吗？</div>`,
+    askMore:p=>`它${p.sweetness===0?"完全不甜":p.sweetness<=2?"几乎不甜":p.sweetness<=3?"中等甜度":"比较甜"}，${ZH_SUG[p.sugar_level]}，${ZH_SERV[p.served]}${p.caffeine?"":"、无咖啡因"}（${p.calories_kcal} 千卡）。要帮你拿一个吗？`,
+    askAbout:(p,topic)=>{
+      const swd=p.sweetness===0?"完全不甜":p.sweetness<=2?"几乎不甜":p.sweetness<=3?"中等甜度":"比较甜";
+      const body=({sweet:`它${swd}，${ZH_SUG[p.sugar_level]}（甜度 ${p.sweetness}/5）。`,temp:`它是${ZH_SERV[p.served]}的。`,caffeine:p.caffeine?"含咖啡因。":"不含咖啡因。",calories:p.calories_kcal>0?`大约 ${p.calories_kcal} 千卡。`:"零卡路里。",ingredients:`这是一款${ZH_CAT[p.category]||p.category}，${swd}，${ZH_SUG[p.sugar_level]}。`,stock:`库存还有 ${p.qty} 个。`})[topic]||`这是一款${ZH_CAT[p.category]||p.category}。`;
+      const ask=C.cart.length?pick(["要加入购物车吗？","帮你加上？"]):pick(["要我帮你拿一个吗？","来一个？"]);
+      return `${body} ${ask}`;},
+    thanks:()=>pick(["不客气！还要别的吗？😊","随时为你服务！还需要点什么？","不用谢～还需要我帮忙吗？"]),
+    thanksPost:()=>pick(["不客气！还要别的吗，还是结账？","随时～再加点，还是现在结账？"]),
+    help:'我们有 <b>饮料</b> —— 白水、NFC 果汁、清爽的电解质水，一份 <b>冷冻甜点</b>（冰淇淋），还有 <b>礼物</b>（盲盒和收藏摆件）。想来点什么？也可以直接说 <i>"随便推荐一个"</i>。',
+    noCaffeine:"抱歉，我们目前没有含咖啡因的饮品。不过冷藏果汁或清爽的电解质水也很提神解渴 —— 想来点什么？",
+    greetReply:()=>pick(["嗨！想来点什么 —— 饮料、甜点，还是礼物？🥤","你好！口渴了，还是想来点甜的或好玩的？","你好呀！告诉我你想要什么，我来帮你搞定。"]),
+    exit:hadCart=>hadCart?"没问题 —— 购物车已清空。欢迎下次再来！👋":"欢迎下次再来！👋",
+    fallback:()=>pick(["抱歉，能换个说法吗？","嗯…我没太听懂 —— 是想要饮料、甜点，还是礼物？"]),
+    offer:(p,f,notSweet,inCart)=>{const reason=notSweet?"清爽不甜":f==="rehydration_electrolytes"?"帮你快速补水、补充电解质":f==="treat_dessert"?"冰凉香甜，好好犒劳自己":f==="gift_novelty"?"拿来送人很有惊喜感":f==="fruit_refreshment"?"果味十足、很清爽":"很稳的选择";const lead=pick(["我推荐","不如试试","给你选了","可以看看"]);const ask=pick(inCart?["要加入购物车吗？","帮你加上？","放进去？"]:["要我帮你拿一个吗？","来一个？","这个可以吗？"]);return {pre:`${lead} ${pname(p)} —— ${reason}。`,ask};}
+  }
+};
+
+/* ===================== ENGINE ===================== */
+const THRESHOLD=2, TIE_MARGIN=1;
+const CUES={
+  rehydration_electrolytes:{strong:["post-workout","post workout","after my workout","after the gym","worked out","working out","just finished working out","gym","workout","exercise","exercised","sweat","sweaty","sweating","electrolyte","electrolytes","recovery","recover","rehydrate","rehydration","dehydrated","dehydration","cramp","cramping","hangover","leg day","gymming","运动","运动后","刚运动","健身","锻炼","锻练","出汗","流汗","电解质","补水","恢复","脱水","抽筋","宿醉","跑步","跑完","补充电解质"],support:["run","ran","running","jog","jogging","hike","hiking","train","training","marathon","spin","yoga","tired","exhausted","wiped","replenish","salts","minerals","sports","sport","gatorade","bounce back","worn out","累","很累","流了汗"]},
+  hydration:{strong:["thirsty","parched","hydrate","hydration","plain water","just water","still water","drink of water","dry mouth","quench","some water","bottle of water","口渴","渴了","渴","解渴","喝水","白水","矿泉水","来点水","要水","纯净水"],support:["water","something light","light","lighter","nothing heavy","simple","clean","refreshing","refresh","no calories","zero calorie","zero sugar","hot day","its hot","healthy","diet","水","清爽","清淡","健康","无糖"]},
+  fruit_refreshment:{strong:["juice","fruity","fruit","smoothie","orange juice","fruit drink","something fruity","berry","mango","peach","citrus","guava","tropical","fruit juice","nfc","果汁","果味","水果","橙汁","芒果汁","番石榴","榨汁","果味饮料"],support:["refreshment","tangy","zesty","pulp","vitamin","vitamins","breakfast","brunch","flavour","flavor","flavoured","flavored","zingy","juicy","酸甜","维生素"]},
+  treat_dessert:{strong:["dessert","ice cream","ice-cream","icecream","gelato","sorbet","popsicle","treat","sweet treat","indulge","indulgent","sundae","milkshake","pudding","甜品","甜点","冰淇淋","雪糕","冰激凌","甜食","犒劳","嘴馋","冷饮"],support:["cold","icy","after dinner","snack","peckish","reward","chocolate","creamy","rich","decadent","frozen","craving","sweet tooth","spoil","冰的","凉的","解馋","奖励自己"]},
+  gift_novelty:{strong:["gift","present","for a friend","for my","collectible","collectable","collector","limited edition","novelty","surprise","souvenir","blind box","blindbox","mystery box","stocking stuffer","birthday","figurine","figure","礼物","礼品","盲盒","收藏","手办","惊喜","送人","送朋友","送礼","生日礼物","摆件"],support:["fun","cute","quirky","unique","special","fancy","party","toy","mystery","kids","kid","nephew","niece","give","好玩","可爱","小孩","侄子","外甥","送给"]}
+};
+const NOT_SWEET=["not sweet","no sugar","sugar free","sugar-free","unsweetened","less sweet","not too sweet","nothing sweet","don't want anything sweet","dont want anything sweet","low sugar","light on sugar","not sugary","without sugar","hate sweet","don't like sweet","dont like sweet","不甜","不要甜","别太甜","不太甜","无糖","少糖","低糖","没有糖","不想要甜","不喜欢甜","不要太甜"];
+const YES_SWEET=["really sweet","very sweet","super sweet","extra sweet","sugary","love sweet","nice and sweet","sweeter","something sweet","甜一点","很甜","要甜","甜的","喜欢甜"];
+const MID_SWEET=["a little sweet","little sweet","a bit sweet","bit sweet","slightly sweet","mildly sweet","a touch sweet","somewhat sweet","kinda sweet","kind of sweet","一点甜","一点点甜","微甜","稍微甜","稍甜","有点甜"];
+const COLD=["cold","chilled","icy","ice cold","ice-cold","cool","refrigerated","colder","冰","冰的","冰镇","凉的","凉","冷的","冰凉"];
+const FROZEN=["frozen","ice cream","gelato","sorbet","popsicle","slushie","冷冻","冰冻"];
+const WARM=["room temperature","room temp","not cold","ambient","not chilled","warmer","常温","不冰","室温","不要冰"];
+const NO_CAF=["no caffeine","caffeine free","caffeine-free","decaf","without caffeine","no coffee","无咖啡因","不要咖啡因","无因"];
+const YES_CAF=["with caffeine","caffeinated","caffeine","energy drink","energy boost","pick me up","pick-me-up","wake me up","keep me awake","stay awake","need a boost","some energy","coffee","espresso","latte","含咖啡因","要咖啡因","提神","醒神","能量饮料","咖啡"];
+const ACCEPT=["sure","yes","yeah","yep","yup","ok","okay","sounds good","sounds great","that works","i'll take it","ill take it","i will take it","take it","take one","get one","get me one","grab one","go ahead","do it","yes please","let's do it","lets do it","perfect","great","that one","i'll have it","ill have it","i'll have","add it","buy it","deal","why not","please do","get it","grab it","好","好的","可以","行","要一个","来一个","就这个","就要这个","好啊","没问题","买","拿一个","是的","对","嗯","要"];
+const DECLINE=["no","nope","nah","not that","not really","something else","anything else","other options","what else","a different one","don't like","dont like","not for me","pass","show me another","not that one","meh","another one","another","different","不要","不用","换一个","换个","别的","其他","不喜欢","不是这个","再换","换","不行"];
+const EXIT=["bye","goodbye","never mind","nevermind","stop","cancel","再见","拜拜","算了","不逛了"];   // true abandonment; done-shopping phrases live in STRONG_CHECKOUT
+const CHECKOUT_CUES=["that's all","thats all","checkout","check out","check me out","done","nothing else","that will be all","that'll be all","thatll be all","no thanks","nothing more","i'm good","im good","that is all","finish","pay","结账","结帐","买单","就这些","够了","完成","没了","不用了","就这样","可以了"];
+// unambiguous checkout phrases honoured from ANY state (softer cues above stay POST_ADD-only to avoid clobbering "no thanks" = decline-this-item)
+const STRONG_CHECKOUT=["checkout","check out","check me out","that's all","thats all","that is all","that's it","thats it","that will be all","that'll be all","thatll be all","i'm done","im done","pay the bill","cash out","结账","结帐","买单","就这些","就这样"];
+const MORE_CUES=["options","other options","what else","show me more","show me options","anything else you","alternatives","what do you have","more choices","还有什么","有什么别的","其他选择","别的选择","换换","有啥"];
+const DONE_NO=["no","nope","nah","not really","no more","that's it","thats it","i'm done","im done"];   // bare "done" signals (POST_ADD)
+const BROWSE=["something else","anything else","a different one","different one","show me another","other stuff","other things","别的","其他","其他的","换点别的","还有别的","再来点别的"];   // "show me more" intent, not checkout
+const READD=["one more","another one","one of those too","one of those as well","same again","add another","one more of those","one more of that","再来一个","再来一瓶","再来一杯","多来一个","再要一个","同样再来"];   // "one more of what I just added" (POST_ADD)
+const NUMWORDS={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,couple:2,pair:2,few:3};
+const ORDINALS={first:0,"1st":0,second:1,"2nd":1,third:2,"3rd":2,fourth:3,last:-1};
+const DISTINCTIVE=["black","green","purple","pink","orange","blue","white grape","white","grape","mango","guava","pomegranate","jasmine","vanilla","evian","nongfu","gareer","electrolyte","juice","water","collectible","blind box","ice cream","黑色","绿色","紫色","粉色","橙色","蓝色","白葡萄","葡萄","芒果","番石榴","石榴","茉莉","依云","农夫","冰淇淋","盲盒","矿泉水"];
+
+const CJK=/[一-鿿]/;
+function normalize(t){return t.toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9'一-鿿\s-]/g," ").replace(/\s+/g," ").trim();}
+const _reCache=Object.create(null);   // phrase → compiled word-boundary regex, built once (regex compilation is costly)
+function has(text,phrase){
+  if(CJK.test(phrase))return text.includes(phrase);
+  let re=_reCache[phrase];
+  if(re===undefined){const p=phrase.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&');re=_reCache[phrase]=new RegExp("(^|\\s)"+p+"($|\\s)");}
+  return re.test(text);
+}
+function anyHas(text,list){return list.some(p=>has(text,p));}
+function cloneC(c){return JSON.parse(JSON.stringify(c));}
+function blankConstraints(){return {max_sweetness:null,notSweet:false,wantSweet:false,prefer_sugar:[],served_in:[],caffeine:null};}
+
+/* --- fuzzy language understanding: stemming + typo tolerance --- */
+const STOP=new Set("a an the i im to for of and or my me you it is are am was want wanna need get gimme got have some something anything like feel feeling really just please would can could id we so am also bit really pretty kinda kind".split(" "));
+function stem(w){let s=w;if(s.length>4)s=s.replace(/(ing|ed)$/,"");if(s.length>3)s=s.replace(/s$/,"");return s;}
+function lev(a,b){const m=a.length,n=b.length;if(Math.abs(m-n)>1)return 2;const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);for(let j=0;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+function wtoks(text){return text.split(" ").filter(w=>w&&!STOP.has(w));}
+// fuzzy typo tolerance only for longer words (avoids sweet≈sweat, cold≈gold collisions)
+function tokMatch(tok,cue){return tok===cue||stem(tok)===stem(cue)||(cue.length>=6&&tok.length>=5&&lev(tok,cue)<=1);}
+function cueHit(text,toks,cue){return (CJK.test(cue)||cue.includes(" ")||cue.includes("-"))?has(text,cue):toks.some(t=>tokMatch(t,cue));}
+
+let _sfKey=null,_sfVal=null;   // 1-entry memo: scoreFunctions depends only on text, and is called several times per turn on the same text
+function scoreFunctions(text){
+  if(text===_sfKey)return {..._sfVal};   // clone so callers can't corrupt the cache
+  const toks=wtoks(text),s={};
+  for(const tag in CUES){let v=0;
+    for(const c of CUES[tag].strong)if(cueHit(text,toks,c))v+=2;
+    for(const c of CUES[tag].support)if(cueHit(text,toks,c))v+=1;
+    if(v)s[tag]=v;}
+  applyNegation(text,s);
+  _sfKey=text;_sfVal=s;
+  return {...s};
+}
+// "no juice", "not a gift", "without coffee" → drop that function
+// strict match + narrow window + stop at first hit, so "no juice, just water" only kills juice
+function applyNegation(text,scores){
+  const NEG=new Set(["no","not","without","dont","hate","avoid","skip","nothing","never","cant"]);
+  const w=text.replace(/'/g,"").split(" ");
+  for(let i=0;i<w.length;i++){
+    if(!NEG.has(w[i]))continue;
+    for(let j=i+1;j<=i+2&&j<w.length;j++){
+      if(NEG.has(w[j])||STOP.has(w[j]))continue;
+      let hit=false;
+      for(const tag of Object.keys(scores)){
+        const single=[...CUES[tag].strong,...CUES[tag].support].filter(c=>!c.includes(" ")&&!c.includes("-"));
+        if(single.some(c=>w[j]===c||stem(w[j])===stem(c))){delete scores[tag];hit=true;}
+      }
+      if(hit)break;
+    }
+  }
+  // Chinese negation: 不要果汁 / 别买礼物 / 没有咖啡因
+  const zhNeg=["不要","不用","不想","别","没有","不喜欢","没"];
+  for(const tag of Object.keys(scores)){
+    const cues=[...CUES[tag].strong,...CUES[tag].support].filter(c=>CJK.test(c));
+    if(cues.some(c=>zhNeg.some(n=>text.includes(n+c))))delete scores[tag];
+  }
+}
+function inferredFrom(sc){
+  const strong=Object.keys(sc).filter(t=>sc[t]>=THRESHOLD).sort((a,b)=>sc[b]-sc[a]);
+  if(strong.length)return strong;
+  const any=Object.keys(sc);
+  return any.length===1?any:[];   // one weak-but-unambiguous signal (e.g. "water") still resolves
+}
+function extractInto(c,text){
+  if(anyHas(text,NOT_SWEET)){c.max_sweetness=2;c.notSweet=true;c.wantSweet=false;c.prefer_sugar=["none","low"];}
+  else if(anyHas(text,MID_SWEET)){c.max_sweetness=3;c.notSweet=false;c.wantSweet=false;c.prefer_sugar=["low","medium"];}
+  else if(anyHas(text,YES_SWEET)){c.wantSweet=true;c.notSweet=false;c.max_sweetness=null;c.prefer_sugar=[];}
+  if(anyHas(text,FROZEN))c.served_in=["frozen"];
+  else if(anyHas(text,COLD))c.served_in=["chilled","frozen"];
+  else if(anyHas(text,WARM))c.served_in=["ambient"];
+  if(anyHas(text,NO_CAF))c.caffeine=false;
+  else if(anyHas(text,YES_CAF))c.caffeine=true;   // future-proof: filters to caffeinated items if any are ever stocked
+  return c;
+}
+function passes(p,c){
+  if(!p.in_stock||p.qty<=0)return false;
+  if(c.max_sweetness!=null&&p.sweetness>c.max_sweetness)return false;
+  if(c.served_in.length&&!c.served_in.includes(p.served))return false;
+  if(c.caffeine!=null&&p.caffeine!==c.caffeine)return false;
+  return true;
+}
+function idealSweet(c,fns){
+  if(c.notSweet)return 0;
+  if(c.max_sweetness!=null)return c.max_sweetness;   // explicit "a little sweet" → aim at the allowed ceiling, not max
+  if(c.wantSweet)return 5;
+  fns=fns||[];
+  if(fns.includes("treat_dessert"))return 5;
+  if(fns.includes("fruit_refreshment"))return 4;
+  if(fns.includes("hydration")||fns.includes("rehydration_electrolytes"))return 0; // plain thirst/recovery → light
+  return 3;
+}
+function scoreProduct(p,fns,c,cueText){
+  const toks=new Set(cueText.split(" "));
+  const fnMatch=p.function_tags.filter(t=>fns.includes(t)).length;
+  let kov=0;for(const k of p.keywords){if(toks.has(k)||cueText.includes(k))kov++;}kov=Math.min(4,kov);
+  const fit=3-Math.min(3,Math.abs(p.sweetness-idealSweet(c,fns)));
+  const sugarPref=c.prefer_sugar.includes(p.sugar_level)?1:0;
+  const tempPref=c.served_in.length?(p.served===c.served_in[0]?1:(c.served_in.includes(p.served)?0.5:0)):0;
+  const stock=p.qty>=10?1:p.qty>=3?0.5:0;
+  return {total:3*fnMatch+2*kov+fit+sugarPref+tempPref+stock,fnMatch,kov,fit};
+}
+function rank(need){
+  const {functions:fns,constraints:c,offeredSkus,rawUtterance}=need;
+  const scored=CATALOG
+    .filter(p=>p.function_tags.some(t=>fns.includes(t)))
+    .filter(p=>passes(p,c)).filter(p=>!offeredSkus.includes(p.id))
+    .map(p=>({p,...scoreProduct(p,fns,c,rawUtterance)}));
+  scored.sort((a,b)=>b.total-a.total||b.fnMatch-a.fnMatch||b.kov-a.kov||b.fit-a.fit||b.p.qty-a.p.qty
+    ||(c.notSweet?a.p.sweetness-b.p.sweetness:b.p.sweetness-a.p.sweetness)||(a.p.id<b.p.id?-1:1));
+  need.scored=scored;need.candidates=scored.map(s=>s.p);return need.candidates;
+}
+function ambiguousPair(fns,sc){if(fns.length<2)return null;return (sc[fns[0]]-sc[fns[1]]<=TIE_MARGIN)?[fns[0],fns[1]]:null;}
+function pairQuestion(pair){const s=new Set(pair);
+  if(s.has("gift_novelty"))return "Is this for yourself, or a gift / something fun to give?";
+  if(s.has("treat_dessert"))return "Something to drink and quench your thirst, or more of a dessert-style treat?";
+  if(s.has("fruit_refreshment"))return "Would you like a plain, replenishing water, or something fruity and flavoured?";
+  return "What matters most — hydration, flavour, or a treat?";}
+const Q_IDENTIFY="Happy to help! Are you after something to hydrate, a fruity pick-me-up, a sweet treat, or a gift?";
+const Q_SWEET="How sweet would you like it — not sweet, a little, or nice and sweet?";
+function needsSweetnessQ(need){const fns=need.functions,c=need.constraints;
+  if(!(fns.includes("fruit_refreshment")||fns.includes("treat_dessert")))return false;
+  if(c.max_sweetness!=null||c.wantSweet)return false;
+  const cand=CATALOG.filter(p=>p.function_tags.some(t=>fns.includes(t)));const sw=cand.map(p=>p.sweetness);
+  return (Math.max(...sw)-Math.min(...sw))>=2;}
+
+const ZHNUM={"一":1,"两":2,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"十":10};
+function parseQty(text){
+  const m=text.match(/(?:make it|get|grab|give me|i'll take|ill take|have|want|add|of them|of those|just)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|a couple|a few|a pair)/);
+  if(m){const w=m[1];return NUMWORDS[w.replace(/^a /,"")]||parseInt(w)||null;}
+  const bare=text.match(/^\s*(\d+|two|three|four|five|couple)\s*(?:please|thanks|of them)?\s*$/);
+  if(bare){const w=bare[1];return NUMWORDS[w]||parseInt(w)||null;}
+  if(/\bmake it (\d+|two|three|four|five)\b/.test(text)){const w=text.match(/\bmake it (\d+|two|three|four|five)\b/)[1];return NUMWORDS[w]||parseInt(w);}
+  const zm=text.match(/([0-9一二两三四五六七八九十]+)\s*(?:个|瓶|杯|份|支|盒)/);   // 两个 / 来三瓶 / 要5个
+  if(zm){const w=zm[1];return ZHNUM[w]||parseInt(w)||null;}
+  return null;
+}
+function parseOrdinal(text){
+  for(const k in ORDINALS){if(has(text,k))return ORDINALS[k];}
+  const zo={"第一":0,"第二":1,"第三":2,"第四":3,"最后":-1};
+  for(const k in zo){if(text.includes(k))return zo[k];}
+  return null;
+}
+function referencedProduct(text,pool){
+  const hits=DISTINCTIVE.filter(d=>text.includes(d));
+  if(!hits.length)return null;
+  let best=null,bestN=0;
+  for(const p of pool){const hay=(p.name+" "+p.flavor+" "+p.keywords.join(" ")+" "+(ZH_NAME[p.id]||"")).toLowerCase();
+    const n=hits.filter(h=>hay.includes(h)).length;if(n>bestN){bestN=n;best=p;}}
+  return bestN>0?best:null;
+}
+// "one more" / "two more" / "another one" → quantity to re-add (POST_ADD); null if not a re-add
+function readdQty(text){
+  const m=text.match(/\b(\d+|one|two|three|four|five|couple)\s+more\b/);
+  if(m){const w=m[1];return NUMWORDS[w]||parseInt(w)||1;}
+  if(anyHas(text,READD))return parseQty(text)||1;
+  return null;
+}
+// which product attribute a question is about (or null) — used to answer product questions precisely
+function questionTopic(text){
+  if(/\b(sugar|sweet|sweetness)\b/.test(text)||/甜|糖/.test(text))return "sweet";
+  if(/\b(cold|chilled|chill|warm|frozen|temperature|hot|room temp)\b/.test(text)||/冰|凉|冷|常温|温度|热/.test(text))return "temp";
+  if(/\b(caffeine|caffeinated|coffee|decaf)\b/.test(text)||/咖啡因|咖啡/.test(text))return "caffeine";
+  if(/\b(calorie|calories|kcal|healthy|fattening|diet)\b/.test(text)||/热量|卡路里|多少卡|健康/.test(text))return "calories";
+  if(/(what.?s in|whats in|made of|made from|ingredient|contain|flavou?r|taste)/.test(text)||/成分|什么味|口味|味道|含什么|里面/.test(text))return "ingredients";
+  if(/(how many|in stock|stock|available|quantity|left)/.test(text)||/库存|还有多少|有几|多少个|剩/.test(text))return "stock";
+  return null;
+}
+// Pull the (possibly incomplete) "message" string out of a streaming JSON action, for live display as it types.
+// Returns the unescaped text so far, or null if the "message" field hasn't started streaming yet.
+function partialMessage(s){
+  const m=s.match(/"message"\s*:\s*"/);
+  if(!m)return null;
+  let out="";
+  for(let i=m.index+m[0].length;i<s.length;i++){
+    const c=s[i];
+    if(c==="\\"){const n=s[i+1];if(n===undefined)break;out+=n==="n"?"\n":n==="t"?"\t":n;i++;}
+    else if(c==='"')break;   // closing quote → message complete
+    else out+=c;
+  }
+  return out;
+}
+// is this utterance a question about the current pick (so we answer instead of re-ranking)?
+function isProductQuestion(raw,text){
+  if(/[?？]/.test(raw))return true;
+  if(/^(is|are|isnt|does|do|doesnt|can|could|has|have|how|what|which|why|where|whats|hows)\b/.test(text))return true;
+  if(/\b(how much|how many|tell me about|what about)\b/.test(text))return true;
+  if(/吗|多少|有没有|是不是|几个|什么味|口味/.test(raw))return true;
+  return false;
+}
+
+/* ===================== CONVERSATION STATE MACHINE ===================== */
+let C;
+function newConvo(){return {state:"GREETING",profile:blankConstraints(),cart:[],history:[],lastRec:null,lastOptions:[],need:null,lastReason:null};}
+function memoryOn(){const e=document.getElementById("knob-memory");return !e||e.value==="on";}
+function clarifyBudget(){const e=document.getElementById("knob-clarify");return e&&e.value==="0.7"?3:2;}
+function newNeed(){return {rawUtterance:"",scores:{},functions:[],constraints:memoryOn()?cloneC(C.profile):blankConstraints(),candidates:[],scored:[],currentRec:null,offeredSkus:[],clarifyCount:0};}
+function persistPrefs(text){
+  if(!memoryOn())return;const c=C.profile;
+  if(anyHas(text,NOT_SWEET)){c.notSweet=true;c.wantSweet=false;c.max_sweetness=2;c.prefer_sugar=["none","low"];}
+  else if(anyHas(text,YES_SWEET)){c.wantSweet=true;c.notSweet=false;c.max_sweetness=null;c.prefer_sugar=[];}
+  if(anyHas(text,NO_CAF))c.caffeine=false;
+}
+function cartAdd(p,q){
+  const ex=C.cart.find(i=>i.id===p.id);
+  if(ex)ex.qty=Math.min(p.qty,ex.qty+q);else C.cart.push({id:p.id,name:p.name,qty:q,location:p.location,ett:p.execution_task_type||null});
+}
+function cartRemove(id){C.cart=C.cart.filter(i=>i.id!==id);}
+
+function infer(){
+  const need=C.need;
+  need.scores=scoreFunctions(need.rawUtterance);
+  need.functions=inferredFrom(need.scores);
+  extractInto(need.constraints,need.rawUtterance);
+  persistPrefs(need.rawUtterance);
+  const fns=need.functions;
+  const reason={need:need.rawUtterance,scores:need.scores,fns:[...fns],constraints:{...need.constraints},candidates:[],exclusions:[],decision:"",inv:""};
+  if(fns.length===0&&need.clarifyCount<clarifyBudget()){reason.decision="ask_clarifying (need unclear)";C.lastReason=reason;C.state="CLARIFY";return {kind:"say",text:L().qIdentify};}
+  const pair=ambiguousPair(fns,need.scores);
+  if(pair&&need.clarifyCount<clarifyBudget()){reason.decision="ask_clarifying ("+pair.join(" vs ")+")";C.lastReason=reason;C.state="CLARIFY";return {kind:"say",text:L().pair(pair)};}
+  if(needsSweetnessQ(need)&&need.clarifyCount<clarifyBudget()){reason.decision="ask_clarifying (sweetness unknown)";C.lastReason=reason;C.state="CLARIFY";return {kind:"say",text:L().qSweet};}
+  return doRank(reason);
+}
+function doRank(reason){
+  const need=C.need;rank(need);
+  const allFn=CATALOG.filter(p=>p.function_tags.some(t=>need.functions.includes(t)));
+  reason.candidates=need.candidates.slice(0,4).map(p=>`${p.name} · sw${p.sweetness} · ${p.sugar_level} · ${p.served} · qty${p.qty}`);
+  reason.exclusions=allFn.filter(p=>!need.candidates.includes(p)).slice(0,4).map(p=>{
+    let why=need.offeredSkus.includes(p.id)?"already declined"
+      :(need.constraints.max_sweetness!=null&&p.sweetness>need.constraints.max_sweetness)?`sweetness ${p.sweetness} > ceiling ${need.constraints.max_sweetness}`
+      :(need.constraints.served_in.length&&!need.constraints.served_in.includes(p.served))?`served ${p.served} ≠ wanted`:"not in top set";
+    return `${p.name} — ${why}`;});
+  if(need.candidates.length===0){
+    if(need.constraints.max_sweetness!=null){need.constraints.max_sweetness=Math.min(5,need.constraints.max_sweetness+1);reason.decision="no match → relax sweetness +1";C.lastReason=reason;return doRank({need:need.rawUtterance,scores:need.scores,fns:[...need.functions],constraints:{...need.constraints},candidates:[],exclusions:[],decision:"",inv:""});}
+    reason.decision="no_match";C.lastReason=reason;C.state="ELICIT_NEED";
+    return {kind:"say",text:L().noMatch};
+  }
+  const rec=need.candidates[0];need.currentRec=rec;C.lastRec=rec;C.lastOptions=need.candidates.slice(0,3);
+  reason.inv=`${rec.name} · qty ${rec.qty} — ${rec.qty>=3?"OK":"LOW"}`;reason.decision=`recommend ${rec.id}`;
+  C.lastReason=reason;C.state="RECOMMEND";
+  return {kind:"recommend",rec};
+}
+function offerLine(p){
+  return L().offer(p,C.need.functions[0],C.need.constraints.notSweet,C.cart.length>0);
+}
+function accept(qty){
+  const p=C.need.currentRec;const want=qty||1;const q=Math.min(want,p.qty);
+  cartAdd(p,q);C.state="POST_ADD";
+  return {kind:"added",product:p,qty:q,capped:want>p.qty};
+}
+function startNeed(text){C.need=newNeed();C.need.rawUtterance=text;return infer();}
+function checkout(){
+  const items=C.cart.map(i=>({...i}));C.state="ELICIT_NEED";C.cart=[];
+  return {kind:"checkout",items};
+}
+
+/* --- small talk & open-ended intents (so it feels conversational) --- */
+const GREET=["hi","hello","hey","yo","hiya","howdy","sup","hey there","good morning","good afternoon","good evening","morning","evening","你好","您好","嗨","哈喽","哈啰","早上好","晚上好","在吗"];
+const THANKS=["thanks","thank you","thankyou","thx","cheers","ta","appreciate it","much appreciated","谢谢","多谢","感谢","谢啦","辛苦了"];
+const HELP=["help","what do you have","what do you sell","whats available","what is available","menu","what can i get","what are my options","whats good","what is good","what should i get","what you got","有什么","有啥","卖什么","菜单","有什么好","都有什么"];
+const SURPRISE=["surprise me","you pick","you choose","you decide","whatever","dunno","i dont know","not sure","recommend something","suggest something","recommend me something","what do you recommend","recommend","suggest","pick for me","up to you","anything is fine","anything works","anything you like","anything at all","just anything","随便","随便推荐","你决定","你选","都行","随你","帮我选","推荐一个","看着来","随便来"];   // bare "anything" removed — it mis-fired on "anything with caffeine" etc.
+function hasNeedSignal(text){
+  return Object.keys(scoreFunctions(text)).length>0||anyHas(text,NOT_SWEET)||anyHas(text,YES_SWEET)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,NO_CAF)||!!referencedProduct(text,CATALOG);
+}
+function forceNeed(fns,text){
+  C.need=newNeed();C.need.rawUtterance=text;C.need.functions=fns;
+  return doRank({need:text,scores:{},fns:[...fns],constraints:{...C.need.constraints},candidates:[],exclusions:[],decision:"open pick",inv:""});
+}
+function metaIntent(text){
+  if(anyHas(text,SURPRISE)&&!hasNeedSignal(text)) return forceNeed(["hydration","rehydration_electrolytes","fruit_refreshment","treat_dessert"],text);
+  if(hasNeedSignal(text)) return null;
+  if(anyHas(text,THANKS)) return {kind:"say",text:L().thanks()};
+  if(anyHas(text,HELP)) return {kind:"say",text:L().help};
+  if(GREET.some(g=>text===g||text.startsWith(g+" ")||text.startsWith(g+",")||text.startsWith(g))) return {kind:"say",text:L().greetReply()};
+  return null;
+}
+
+function handle(raw){
+  const text=normalize(raw);
+  C.history.push({role:"user",text:raw});
+  if(anyHas(text,EXIT)){C.state="END";return {kind:"say",text:L().exit(C.cart.length>0),clear:true};}
+  // Checkout is honoured from ANY state (this is also where the always-enabled Checkout button routes).
+  if(anyHas(text,STRONG_CHECKOUT)){
+    if(!C.cart.length){C.state="ELICIT_NEED";return {kind:"say",text:L().cartEmptyElicit};}
+    return checkout();
+  }
+  // We stock nothing caffeinated — answer honestly instead of handing over a caffeine-free drink for a caffeine request.
+  if(anyHas(text,YES_CAF)&&!anyHas(text,NO_CAF)&&!CATALOG.some(p=>p.caffeine&&p.in_stock)
+     &&(C.state==="GREETING"||C.state==="ELICIT_NEED"||C.state==="END"||C.state==="POST_ADD")){
+    if(C.state==="END")C.cart=[];
+    C.state=C.cart.length?"POST_ADD":"ELICIT_NEED";
+    return {kind:"say",text:L().noCaffeine};
+  }
+
+  if(C.state==="GREETING"||C.state==="ELICIT_NEED"||C.state==="END"){
+    if(C.state==="END")C.cart=[];
+    const meta=metaIntent(text);
+    if(meta)return meta;
+    if(!hasNeedSignal(text))return {kind:"escalate",raw};   // rules recognise nothing → hand this turn to the LLM
+    return startNeed(text);
+  }
+  if(C.state==="CLARIFY"){C.need.clarifyCount++;C.need.rawUtterance=(C.need.rawUtterance+" "+text).trim();return infer();}
+
+  if(C.state==="RECOMMEND"){
+    const need=C.need;
+    // show alternatives
+    if(anyHas(text,MORE_CUES)&&!anyHas(text,ACCEPT)){
+      C.lastOptions=need.candidates.slice(0,3);
+      return {kind:"options",options:C.lastOptions};
+    }
+    // ordinal pick from last options
+    const ord=parseOrdinal(text);
+    if(ord!=null&&C.lastOptions.length){
+      const pick=ord===-1?C.lastOptions[C.lastOptions.length-1]:C.lastOptions[ord];
+      if(pick){need.currentRec=pick;C.lastRec=pick;
+        if(anyHas(text,ACCEPT)||/\b(take|have|get|want|add|instead)\b/.test(text))return accept(parseQty(text));
+        return {kind:"recommend",rec:pick,reselect:true};}
+    }
+    // named reference ("the pink one", "the mango")
+    const SWITCH=["different","换","换个","换一个","再换"];   // "switch to X" reads as a reference, not a plain no
+    const ref=referencedProduct(text,need.candidates.length?need.candidates:CATALOG);
+    if(ref&&!anyHas(text,DECLINE.filter(d=>!SWITCH.includes(d)))){
+      need.currentRec=ref;C.lastRec=ref;
+      if(!need.candidates.includes(ref)){need.functions=[...new Set([...need.functions,...ref.function_tags])];}
+      if(anyHas(text,ACCEPT)||anyHas(text,SWITCH)||/\b(take|have|get|want|add|instead|rather|prefer)\b/.test(text))return accept(parseQty(text));
+      return {kind:"recommend",rec:ref,reselect:true};
+    }
+    // quantity => accept with qty
+    const q=parseQty(text);
+    if(q!=null&&!anyHas(text,DECLINE)){return accept(q);}
+    // accept
+    if(anyHas(text,ACCEPT)&&!anyHas(text,DECLINE)){return accept(parseQty(text));}
+    // product question about the current pick ("is it cold?", "how much sugar?") → answer it, keep the same rec.
+    // Must run BEFORE constraint extraction, else "is it cold?" is misread as a "make it cold" refinement.
+    if(isProductQuestion(raw,text)&&!anyHas(text,ACCEPT)&&!anyHas(text,DECLINE)){
+      const topic=questionTopic(text);
+      return {kind:"say",text:topic?L().askAbout(need.currentRec,topic):L().askMore(need.currentRec)};
+    }
+    // decline with 'too sweet'
+    if(has(text,"too sweet")||has(text,"too sugary")){
+      need.offeredSkus.push(need.currentRec.id);
+      need.constraints.max_sweetness=Math.max(0,need.currentRec.sweetness-1);need.constraints.notSweet=true;need.constraints.prefer_sugar=["none","low"];
+      if(!need.functions.includes("hydration"))need.functions.push("hydration");persistPrefs("not sweet");
+      return doRank(freshReason());
+    }
+    // decline with a new constraint
+    if(anyHas(text,NOT_SWEET)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,WARM)||anyHas(text,NO_CAF)){
+      need.offeredSkus.push(need.currentRec.id);extractInto(need.constraints,text);persistPrefs(text);
+      return doRank(freshReason());
+    }
+    // plain decline
+    if(anyHas(text,DECLINE)){
+      need.offeredSkus.push(need.currentRec.id);return doRank(freshReason());
+    }
+    // ask_more
+    return {kind:"say",text:L().askMore(need.currentRec)};
+  }
+
+  if(C.state==="POST_ADD"){
+    // "one more" / "N more" → re-add the item we just added
+    const rq=readdQty(text);
+    if(rq!=null&&((C.need&&C.need.currentRec)||C.lastRec)){
+      const p=(C.need&&C.need.currentRec)||C.lastRec;
+      cartAdd(p,rq);return {kind:"added",product:p,qty:Math.min(rq,p.qty),capped:rq>p.qty};
+    }
+    // done → checkout (soft done-cues or a bare "no"; NOT when browsing, naming a product, or stating a need)
+    if((anyHas(text,CHECKOUT_CUES)||anyHas(text,DONE_NO))&&!anyHas(text,MORE_CUES)&&!anyHas(text,BROWSE)&&!scoreFunctions(text).length&&!referencedProduct(text,CATALOG)){
+      if(!C.cart.length){C.state="ELICIT_NEED";return {kind:"say",text:L().cartEmptyElicit};}
+      return checkout();
+    }
+    // browse ("what else do you have", "something else") → show the menu, stay open for a new item
+    if((anyHas(text,BROWSE)||anyHas(text,MORE_CUES))&&!hasNeedSignal(text)&&!referencedProduct(text,CATALOG)){
+      return {kind:"say",text:L().help};
+    }
+    // remove item
+    if(/(?:remove|take off|drop|delete|without|移除|去掉|删掉|拿掉|去除|不要了)/.test(text)){
+      const ref=referencedProduct(text,C.cart.map(i=>CATALOG.find(p=>p.id===i.id)));
+      if(ref){cartRemove(ref.id);return {kind:"removed",product:ref};}
+    }
+    // small talk in the middle of shopping
+    if(anyHas(text,THANKS)&&!hasNeedSignal(text)) return {kind:"say",text:L().thanksPost()};
+    const meta=metaIntent(text);
+    if(meta)return meta;                                           // help/greet reply, or "you pick" → recommend
+    if(!hasNeedSignal(text))return {kind:"escalate",raw};          // unrecognised mid-shopping → hand to LLM
+    // otherwise a new need
+    return startNeed(text);
+  }
+  return {kind:"escalate",raw};   // truly nothing matched → let the LLM try
+}
+function freshReason(){const n=C.need;return {need:n.rawUtterance,scores:n.scores,fns:[...n.functions],constraints:{...n.constraints},candidates:[],exclusions:[],decision:"",inv:""};}
+
+/* ===================== UI ===================== */
+const msgsEl=document.getElementById("msgs"),inEl=document.getElementById("in"),reasonEl=document.getElementById("reason"),
+  invEl=document.getElementById("inv"),stateEl=document.getElementById("statebar"),chipsEl=document.getElementById("chips"),
+  prefsEl=document.getElementById("prefs"),cartEl=document.getElementById("cart"),cartTotEl=document.getElementById("carttot"),checkoutBtn=document.getElementById("checkout");
+const STATES=["ELICIT_NEED","CLARIFY","RECOMMEND","POST_ADD","CHECKOUT"];
+
+function sweetDots(n){let h='<span class="sweet">';for(let i=0;i<5;i++)h+=`<i class="${i<n?'f':''}"></i>`;return h+'</span>';}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+
+function renderInventory(){
+  const need=C.need,rec=C.llmRec||((C.state==="RECOMMEND"&&need)?need.currentRec:null);
+  const cand=new Set(need&&need.candidates?need.candidates.map(p=>p.id):[]);
+  const inCart={};C.cart.forEach(i=>inCart[i.id]=i.qty);
+  const active=C.state==="RECOMMEND"&&cand.size;
+  invEl.innerHTML=CATALOG.map(p=>{
+    const isRec=rec&&rec.id===p.id,isHit=cand.has(p.id)&&!isRec,dim=active&&!cand.has(p.id)&&!isRec;
+    const cls=isRec?"p rec":isHit?"p hit":dim?"p dim":"p";
+    const isNovel=p.category==="Blind Box"||p.category==="Collectible";
+    return `<div class="${cls}">${isRec?'<span class="recflag">PICK</span>':''}${inCart[p.id]?`<span class="qbadge">${L().ui.inCart(inCart[p.id])}</span>`:''}
+      <div class="nm">${esc(pname(p))}</div><div class="cat">${pcat(p)}${!zh()&&p.flavor&&!isNovel?" · "+cap(p.flavor):""}</div>
+      <div class="attrs">${p.function_tags.map(t=>`<span class="b fn">${zh()?ZH_FN[t]:cap(t.replace("rehydration_electrolytes","electrolytes").replace("fruit_refreshment","fruit").replace("treat_dessert","dessert").replace("gift_novelty","gift"))}</span>`).join("")}
+        <span class="b sw">${isNovel?"—":sweetDots(p.sweetness)}</span><span class="b">${zh()?ZH_SUG[p.sugar_level]:cap(p.sugar_level)+" sugar"}</span><span class="b st">${zh()?ZH_SERV[p.served]:cap(p.served)}</span><span class="b">${zh()?"库存 "+p.qty:"Qty "+p.qty}</span></div></div>`;
+  }).join("");
+  document.getElementById("invcount").textContent=L().ui.skus(CATALOG.length);
+}
+function renderState(){stateEl.innerHTML=STATES.map(s=>`<span class="pill ${s===C.state?'on':''}">${s}</span>`).join('<span class="arrow">›</span>');}
+function renderSession(){
+  const c=C.profile,u=L().ui,prefs=[];
+  if(c.notSweet)prefs.push(u.prefAvoid);if(c.wantSweet)prefs.push(u.prefLike);if(c.caffeine===false)prefs.push(u.prefNoCaf);
+  prefsEl.innerHTML=prefs.length?prefs.map(p=>`<span class="pref">${p}</span>`).join(""):`<span class="pref none">${u.noneYet}</span>`;
+  cartEl.innerHTML=C.cart.length?C.cart.map(i=>`<div class="cartitem"><span class="q">×${i.qty}</span><span class="nm">${esc(pname(byId(i.id)))}</span><button class="rm" data-id="${i.id}" title="remove">✕</button></div>`).join(""):`<div class="cartempty">${u.empty}</div>`;
+  const units=C.cart.reduce((a,i)=>a+i.qty,0);
+  cartTotEl.textContent=C.cart.length?u.tot(C.cart.length,units):"";
+  checkoutBtn.disabled=!C.cart.length;
+  cartEl.querySelectorAll(".rm").forEach(b=>b.onclick=()=>{const p=byId(b.dataset.id);cartRemove(p.id);botSay(L().removed(pname(p)));});
+}
+function renderReason(){
+  if(C.llmReason){const a=C.llmReason;
+    reasonEl.innerHTML=[`<span class="ln"><span class="rk">engine </span><span class="tag">${esc(a.engine)}</span></span>`,
+      `<span class="ln"><span class="rk">action </span><span class="rv">▸ ${esc(a.action||"—")}${a.sku?" ("+esc(a.sku)+")":""}</span></span>`].join("\n");return;}
+  const r=C.lastReason;
+  if(!r){reasonEl.innerHTML='<span class="placeholder">'+esc(L().ui.reasonPlaceholder)+'</span>';return;}
+  const sc=Object.entries(r.scores).map(([k,v])=>`${k}:${v}`).join(", ")||"—";
+  const cons=[];if(r.constraints.max_sweetness!=null)cons.push(`sweetness ≤ ${r.constraints.max_sweetness}`);if(r.constraints.wantSweet)cons.push("prefer sweet");if(r.constraints.served_in.length)cons.push("served ∈ "+r.constraints.served_in.join("/"));if(r.constraints.caffeine===false)cons.push("caffeine-free");
+  const lines=[];
+  lines.push(`<span class="ln"><span class="rk">need       </span><span class="rv">${esc(r.need||"—")}</span></span>`);
+  lines.push(`<span class="ln"><span class="rk">scores     </span><span class="rv">${esc(sc)}</span></span>`);
+  lines.push(`<span class="ln"><span class="rk">function   </span><span class="tag">${r.fns.length?r.fns.join(" + "):"AMBIGUOUS / none"}</span></span>`);
+  lines.push(`<span class="ln"><span class="rk">constraints</span> <span class="rv">${cons.length?esc(cons.join("; ")):"none"}</span></span>`);
+  if(r.candidates.length)lines.push(`<span class="ln"><span class="rk">candidates </span><span class="cand">${r.candidates.map(esc).join("\n           ")}</span></span>`);
+  if(r.exclusions.length)lines.push(`<span class="ln"><span class="rk">excluded   </span><span class="ex">${r.exclusions.map(esc).join("\n           ")}</span></span>`);
+  if(r.inv)lines.push(`<span class="ln"><span class="rk">inventory  </span><span class="ok">${esc(r.inv)}</span></span>`);
+  lines.push(`<span class="ln"><span class="rk">decision   </span><span class="rv">▸ ${esc(r.decision)}</span></span>`);
+  reasonEl.innerHTML=lines.join("\n");
+}
+function refresh(){renderState();renderReason();renderSession();renderInventory();}
+
+function addMsg(who,html){const row=document.createElement("div");row.className="row "+who;
+  row.innerHTML=`<div class="av ${who}">${who==="bot"?"🤖":"🧑"}</div><div class="bub">${html}</div>`;
+  msgsEl.appendChild(row);msgsEl.scrollTop=msgsEl.scrollHeight;return row;}
+// brief "typing" beat for the (instant) rule path — 40ms for short replies, up to 130ms for long ones.
+// Set TYPING_MIN=TYPING_MAX=0 for zero delay. The LLM path shows real latency instead of this.
+const TYPING_MIN=40, TYPING_MAX=130;
+function botSay(html){const t=addMsg("bot",'<span class="typing"><span></span><span></span><span></span></span>');
+  const delay=Math.min(TYPING_MAX,TYPING_MIN+html.replace(/<[^>]+>/g,"").length*0.5);
+  setTimeout(()=>{t.querySelector(".bub").innerHTML=html;msgsEl.scrollTop=msgsEl.scrollHeight;refresh();},delay);}
+function recCard(p){const isNovel=p.category==="Blind Box"||p.category==="Collectible";
+  const sub=zh()?`${pcat(p)} · ${ZH_SUG[p.sugar_level]} · ${ZH_SERV[p.served]}`:`${p.category}${p.flavor&&!isNovel?" · "+cap(p.flavor):""} · ${cap(p.sugar_level)} sugar · ${cap(p.served)}`;
+  return `<div class="rec"><div><div class="nm">${esc(pname(p))}</div><div class="px">${esc(sub)}</div></div></div>`;}
+
+/* ===================== RENDER ===================== */
+function render(r){
+  if(r.kind==="recommend"){const o=offerLine(r.rec);
+    botSay(`${esc(o.pre)}${recCard(r.rec)}<div style="margin-top:7px">${esc(o.ask)}</div>`);}
+  else if(r.kind==="added") botSay(L().added(pname(r.product),r.qty,r.capped));
+  else if(r.kind==="removed") botSay(L().removed(pname(r.product)));
+  else if(r.kind==="options") botSay(L().options(r.options));
+  else if(r.kind==="checkout"){
+    const plan=r.items.map(i=>L().planRow(zh()?DIRW_ZH[i.location.turn_direction]:DIRW[i.location.turn_direction],i.qty,i.ett,pname(byId(i.id)))).join("");
+    botSay(L().checkout(r.items.reduce((a,i)=>a+i.qty,0),plan));}
+  else botSay(esc(r.text));
+}
+function refreshGreetingBubble(){
+  const rows=[...msgsEl.querySelectorAll('.row.bot')];
+  rows.forEach(row=>{
+    const bubble=row.querySelector('.bub');
+    if(!bubble||bubble.querySelector('.typing'))return;
+    const txt=(bubble.textContent||'').trim();
+    if(!txt) return;
+    if(/store assistant|门店助手|What can I get you today|今天想来点什么|What are you in the mood for today|想来点什么|What are you after|想来点什么/.test(txt)){
+      bubble.innerHTML=esc(L().greet());
+    }
+  });
+}
+/* ===================== IN-BROWSER LLM (WebLLM · WebGPU) ===================== */
+// The rule engine handles almost everything instantly and offline; only genuinely unrecognized turns escalate here.
+// This runs a small model ENTIRELY in the visitor's browser via WebGPU — no server, no API key, no Ollama. On the
+// FIRST escalation it downloads the model (~1 GB) from a CDN and caches it; after that it's instant. If WebGPU is
+// unavailable or the load fails, we fall back to a single clarifying question, so the file works for everyone.
+let ollHistory=[];
+// One bilingual model keeps the download to a single fetch. Swap for any other prebuilt WebLLM id:
+// smaller/faster → "Qwen2.5-0.5B-Instruct-q4f16_1-MLC"; higher quality → "Llama-3.2-3B-Instruct-q4f16_1-MLC".
+const WEBLLM_MODEL="Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+let _mlc=null,_mlcLoading=null;
+async function loadLLM(onProgress){
+  if(_mlc)return _mlc;
+  if(!_mlcLoading){
+    _mlcLoading=(async()=>{
+      if(!navigator.gpu)throw new Error("no-webgpu");
+      const webllm=await import("https://esm.run/@mlc-ai/web-llm");   // loaded lazily, only when an escalation needs it
+      return await webllm.CreateMLCEngine(WEBLLM_MODEL,{initProgressCallback:onProgress});
+    })();
+  }
+  try{_mlc=await _mlcLoading;return _mlc;}catch(e){_mlcLoading=null;throw e;}
+}
+// Compact one-line-per-item table instead of full JSON — far fewer prompt tokens (keywords/blurb dropped; they're
+// only for the rule engine, the LLM doesn't need them). Fewer tokens = faster prefill on a local model.
+function catalogForLLM(){
+  return CATALOG.map(p=>[p.id,zh()?(ZH_NAME[p.id]||p.name):p.name,p.function_tags.join("/"),p.sweetness,p.sugar_level,p.served,p.caffeine?"caffeine":"caffeine-free",p.qty].join(" | ")).join("\n");
+}
+function sysPrompt(){
+  return [
+"You are the in-store recommendation brain for a retail vending robot. Help one shopper pick the best drink or treat, build a cart across the conversation, and check out when done.",
+zh()?"务必用简体中文和顾客对话（message 字段用中文）。":"Reply to the shopper in English (the message field in English).",
+"Function tags (fixed set): hydration, rehydration_electrolytes, fruit_refreshment, treat_dessert, gift_novelty.",
+"Rules: recommend only in-stock catalog items, by their exact id, one at a time. Honour constraints — not sweet ⇒ sweetness ≤ 2 & low/no sugar; cold ⇒ chilled/frozen; no caffeine ⇒ caffeine false. Remember stated preferences. If the need is unclear, ask ONE clarifying question. When the shopper agrees to buy, add_to_cart; when they're done, checkout.",
+"Respond with ONE JSON object and nothing else.",
+'"action" MUST be exactly ONE of these single words (never the list): recommend, add_to_cart, remove_from_cart, checkout, ask_clarifying, reply. "sku" is exactly ONE catalog id (required for recommend/add_to_cart/remove_from_cart). "qty" is an integer for add_to_cart (default 1). "message" is the sentence shown to the shopper.',
+'Example: {"action":"recommend","sku":"evian_natural_mineral_water","message":"..."}',
+"The live cart is provided each turn and is authoritative.",
+"CATALOG — one item per line, fields: id | name | function_tags | sweetness(0-5) | sugar | served | caffeine | qty\n"+catalogForLLM()
+  ].join("\n");
+}
+// tolerant of small-model sloppiness: enum echoed in "action", multiple/space-joined "sku"
+const ACTIONS=["recommend","add_to_cart","remove_from_cart","checkout","ask_clarifying","reply"];
+function applyAction(a){
+  C.llmRec=null;
+  const act=ACTIONS.find(x=>String(a.action||"").toLowerCase().includes(x))||"reply";  // recommend-first = safest read of an echoed enum
+  let sku=null;
+  if(a.sku){sku=String(a.sku).split(/[^A-Za-z0-9_]+/).map(s=>s.toLowerCase()).find(id=>byId(id))||null;}  // first valid id
+  C.llmReason={engine:"In-browser · "+WEBLLM_MODEL.replace(/-q4.*$/,""),action:act,sku};
+  const p=sku?byId(sku):null;
+  // hand the resulting state back to the rule engine so the NEXT turn can be answered instantly by the rules.
+  if(act==="recommend"&&p){C.llmRec=p;C.lastRec=p;C.lastOptions=[p];
+    C.need=newNeed();C.need.currentRec=p;C.need.candidates=[p];C.need.functions=[...p.function_tags];
+    C.state="RECOMMEND";return {text:a.message,rec:p};}
+  if(act==="add_to_cart"&&p){const q=Math.min(Math.max(1,a.qty||1),p.qty);cartAdd(p,q);C.llmRec=p;C.lastRec=p;C.state="POST_ADD";return {text:a.message};}
+  if(act==="remove_from_cart"&&p){cartRemove(p.id);C.state=C.cart.length?"POST_ADD":"ELICIT_NEED";return {text:a.message};}
+  if(act==="checkout"){const items=C.cart.map(i=>({...i}));C.cart=[];C.state="ELICIT_NEED";return {text:a.message,checkout:items};}
+  return {text:a.message};   // ask_clarifying / reply / recommend-without-valid-sku — leave state; rules re-escalate next turn if still unrecognised
+}
+async function respondLLM(raw){
+  const t=addMsg("bot",'<span class="typing"><span></span><span></span><span></span></span>');
+  const bub=t.querySelector(".bub");
+  try{
+    // First escalation loads the model (~1 GB, cached afterwards) — show download progress in the bubble.
+    const engine=await loadLLM(p=>{const pct=Math.round(((p&&p.progress)||0)*100);
+      bub.innerHTML=esc((zh()?"正在加载浏览器内 AI…":"Loading the in-browser AI…")+" "+pct+"%")+'<span class="caret">▌</span>';});
+    const cartStr=C.cart.length?C.cart.map(i=>`${i.qty}x ${i.name}`).join(", "):"empty";
+    const messages=[{role:"system",content:sysPrompt()},...ollHistory,{role:"user",content:`[current cart: ${cartStr}]\n\nShopper: ${raw}`}];
+    // Stream so the reply types out live as the in-browser model generates it.
+    const stream=await engine.chat.completions.create({messages,temperature:0.2,max_tokens:256,response_format:{type:"json_object"},stream:true});
+    let content="";
+    for await(const chunk of stream){
+      const d=(chunk&&chunk.choices&&chunk.choices[0]&&chunk.choices[0].delta&&chunk.choices[0].delta.content)||"";
+      if(!d)continue;
+      content+=d;
+      const partial=partialMessage(content);            // extract the message field as it fills in
+      if(partial){bub.innerHTML=esc(partial)+'<span class="caret">▌</span>';msgsEl.scrollTop=msgsEl.scrollHeight;}
+    }
+    let a;try{a=JSON.parse(content);}catch(e){throw new Error("non-JSON reply");}   // full JSON action, now complete
+    ollHistory.push({role:"user",content:raw});ollHistory.push({role:"assistant",content:a.message||"(ok)"});
+    const r=applyAction(a);
+    let html=esc(r.text||"")+(r.rec?recCard(r.rec):"");
+    if(r.checkout){const plan=r.checkout.map(i=>L().planRow(zh()?DIRW_ZH[i.location.turn_direction]:DIRW[i.location.turn_direction],i.qty,i.ett,pname(byId(i.id)))).join("");html=esc(r.text||"")+`<div class="plan">${plan}</div>`;}
+    bub.innerHTML=html;refresh();
+  }catch(err){
+    // WebGPU missing / model load failed / bad output — the rules already couldn't parse this turn, so fall back
+    // to a single clarifying question rather than re-running the rules (which would re-escalate).
+    const why=(err&&err.message==="no-webgpu")?L().ui.noWebGPU:L().ui.llmErr;
+    bub.innerHTML=`<span class="err">⚠ ${why}</span>`;
+    C.llmReason=null;C.llmRec=null;C.state=C.cart.length?"POST_ADD":"ELICIT_NEED";
+    botSay(esc(L().qIdentify));
+  }
+}
+// Rule engine first: it answers instantly and offline, and keeps the rich need→function→candidates reasoning
+// panel. Only genuinely unrecognized turns escalate to the in-browser model (which still runs the full
+// recommend / add_to_cart / checkout action set). Language auto-detected per message.
+function respondRaw(raw){
+  const detected=/[一-鿿]/.test(raw)?"zh":"en";
+  if(LANG_SOURCE!=="manual"&&detected!==LANG)setLangUI(detected,"auto");   // only rebuild the UI when the language actually flips
+  const r=handle(raw);                                    // immediate, rule-based response
+  if(r&&r.kind==="escalate")return respondLLM(raw);       // rules didn't understand → in-browser AI
+  C.llmReason=null;C.llmRec=null;                          // rule turn: show the scratchpad panel, not the LLM line
+  render(r);
+}
+function send(){const v=inEl.value.trim();if(!v)return;addMsg("user",esc(v));inEl.value="";respondRaw(v);}
+function reset(){C=newConvo();ollHistory=[];C.llmRec=null;C.llmReason=null;msgsEl.innerHTML="";C.state="ELICIT_NEED";refresh();addMsg("bot",L().greet());}
+
+// update all static UI labels for the current language (no conversation reset)
+function setLangUI(l,source="auto"){
+  LANG=l;LANG_SOURCE=source;
+  const u=L().ui;
+  document.documentElement.lang=l==="zh"?"zh":"en";
+  document.getElementById("t-chat").textContent=u.chat;
+  document.getElementById("t-reason").textContent=u.reason;
+  document.getElementById("t-session").textContent=u.session;
+  document.getElementById("t-prefs").textContent=u.prefs;
+  document.getElementById("t-cartlabel").textContent=u.cart;
+  document.getElementById("t-inv").textContent=u.inv;
+  checkoutBtn.textContent=u.checkout;
+  document.getElementById("send").textContent=u.send;
+  inEl.placeholder=u.placeholder;
+  document.getElementById("legend").innerHTML=u.legend.map(x=>`<span>${x}</span>`).join("");
+  chipsEl.innerHTML=L().chips.map(e=>`<span class="chip">${esc(e)}</span>`).join("");
+  chipsEl.querySelectorAll(".chip").forEach((c,i)=>c.onclick=()=>{addMsg("user",esc(L().chips[i]));respondRaw(L().chips[i]);});
+  document.getElementById("lang-en").classList.toggle("on",l==="en");
+  document.getElementById("lang-zh").classList.toggle("on",l==="zh");
+  refresh();
+  refresh();
+  refreshGreetingBubble();
+  // If the conversation hasn't started yet, always replace the first bot greeting
+  try{
+    if((typeof C==='undefined')||!C.history||C.history.length===0){
+      const firstBotBubble = msgsEl.querySelector('.row.bot .bub');
+      if(firstBotBubble && !firstBotBubble.querySelector('.typing')){
+        firstBotBubble.innerHTML = esc(L().greet());
+      }
+    }
+  }catch(e){/* ignore */}
+}
+
+document.getElementById("send").onclick=send;
+document.getElementById("reset").onclick=reset;
+document.getElementById("lang-en").onclick=()=>setLangUI("en","manual");
+document.getElementById("lang-zh").onclick=()=>setLangUI("zh","manual");
+checkoutBtn.onclick=()=>{if(C.cart.length){const m=zh()?"结账":"check me out";addMsg("user",m);respondRaw(m);}};
+inEl.addEventListener("keydown",e=>{if(e.key==="Enter")send();});
+reset();setLangUI("en","auto");   // reset() initialises C first, then labels are set
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+Retail Recommendation Chatbot — how to open
+============================================
+
+WHAT THIS IS
+A self-contained product-recommendation chatbot demo (English / 中文).
+Everything runs on your own device — no account, no sign-up, nothing sent anywhere.
+
+FASTEST WAY TO OPEN
+Double-click  index.html  — it opens in your web browser and works right away.
+
+The chatbot's core — understanding you, recommending items, the cart, checkout —
+runs INSTANTLY and completely OFFLINE. Try typing:
+    "I just worked out, nothing sweet"
+    "surprise me"
+    "the pink one instead"
+    "that's all, check me out"
+
+THE AI PART (only for unusual, off-script questions)
+For messages the built-in rules can't handle, a small AI model runs INSIDE YOUR
+BROWSER using WebGPU. The first time that happens it downloads the model (about 1 GB)
+and then caches it. So:
+    • You need internet the FIRST time the AI is used (offline after that).
+    • You need a WebGPU browser: Chrome or Edge (recent), or Safari 17+.
+    • You need a reasonably modern computer.
+If your browser can't run it, the demo just stays on the instant offline engine —
+it never breaks.
+
+MOST RELIABLE WAY  (use this if the AI doesn't start from a double-click)
+Serve the folder locally, then open the link:
+    1. Open a terminal / command prompt in this folder.
+    2. Run:   python3 -m http.server 8000
+    3. Visit: http://localhost:8000/index.html
+Or drop this folder on any free static host (GitHub Pages, Netlify, Cloudflare Pages)
+and share the link — that's the smoothest experience for the AI.
+
+FILES IN THIS FOLDER
+    index.html    the app (this is all you really need)
+    README.md     full documentation
+    ENGINE.md     how the recommendation engine works
+    catalog.json  the product list
+    test.js       developer tests  (run with:  node test.js)

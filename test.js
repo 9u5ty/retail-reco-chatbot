@@ -1,0 +1,245 @@
+#!/usr/bin/env node
+/*
+ * Regression harness for the product-recommendation demo.
+ *
+ * The demo ships as a single self-contained index.html. This test loads that file,
+ * extracts the DOM-free engine (everything above the "UI" section), stubs the two
+ * UI helpers the engine references (pick/esc) and a null `document`, then drives
+ * real scripted conversations through handle() and asserts on the returned action
+ * and the mutated session (state / cart / profile).
+ *
+ * Run:  node test.js        (exit code 0 = all pass, 1 = a failure)
+ *
+ * No dependencies. Deterministic (pick() is stubbed to take the first variant, and
+ * the engine uses no Math.random outside pick()).
+ */
+const fs = require("fs");
+const path = require("path");
+
+/* ---- load + extract the engine ---- */
+const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
+const script = html.split("<script>")[1].split("</script>")[0];
+const uiMarker = "/* ===================== UI ===================== */";
+const cut = script.indexOf(uiMarker);
+if (cut < 0) { console.error("Could not find the UI section marker in index.html"); process.exit(2); }
+const engine = script.slice(0, cut);
+
+/* ---- stubs for the handful of UI helpers the engine text references ---- */
+const prelude = `
+  var document = { getElementById: function(){ return null; } };  // memoryOn()/clarifyBudget() guard on null -> defaults
+  function pick(a){ return a[0]; }                                 // deterministic
+  function esc(s){ return String(s); }
+`;
+const driver = `; globalThis.__engine = {
+  handle: handle,
+  reset: function(){ C = newConvo(); C.state = "ELICIT_NEED"; },
+  setLang: function(l){ LANG = l; },
+  C: function(){ return C; },
+  score: function(t){ return scoreFunctions(normalize(t)); },
+  ideal: function(c, fns){ return idealSweet(c, fns); },
+  extract: function(t){ const c = blankConstraints(); extractInto(c, normalize(t)); return c; },
+  partialMessage: function(s){ return partialMessage(s); },
+};`;
+// eslint-disable-next-line no-eval
+eval(prelude + engine + driver);
+const E = globalThis.__engine;
+
+/* ---- tiny assert framework ---- */
+let pass = 0, fail = 0; const failures = [];
+function ok(name, cond, extra) {
+  if (cond) { pass++; }
+  else { fail++; failures.push(name); console.log("  ✗ " + name + (extra !== undefined ? "  → " + JSON.stringify(extra) : "")); }
+}
+function section(t){ console.log("\n" + t); }
+
+/* helper: one turn -> {kind, ...} (never renders; just the action + mutated session) */
+function turn(msg){ return E.handle(msg); }
+function state(){ return E.C().state; }
+function cart(){ return E.C().cart; }
+function cartHas(re){ return cart().some(i => re.test(i.name)); }
+function rec(r){ return r && r.rec ? r.rec.name : null; }
+
+/* ============================ ENGLISH ============================ */
+E.setLang("en");
+
+section("EN · rule engine handles recognized turns instantly (no LLM escalation)");
+E.reset();
+let r = turn("I just finished working out; nothing sweet");
+ok("workout+not-sweet -> recommend", r.kind === "recommend", r.kind);
+ok("  picks an electrolyte water", /Electrolyte/i.test(rec(r)), rec(r));
+ok("  low sweetness (<=2)", r.rec && r.rec.sweetness <= 2, r.rec && r.rec.sweetness);
+r = turn("make it two");
+ok("  \"make it two\" -> added qty 2", r.kind === "added" && r.qty === 2, { kind: r.kind, qty: r.qty });
+ok("  cart now holds the electrolyte", cartHas(/Electrolyte/i), cart().map(i => i.name));
+r = turn("now I'd love some ice cream");
+ok("  new need \"ice cream\" -> recommend Ice Cream", r.kind === "recommend" && /Ice Cream/i.test(rec(r)), rec(r));
+r = turn("sure");
+ok("  \"sure\" -> added", r.kind === "added", r.kind);
+r = turn("that's all, check me out");
+ok("  checkout -> kind checkout w/ 2 lines", r.kind === "checkout" && r.items.length === 2, r.items && r.items.length);
+ok("  cart cleared after checkout", cart().length === 0, cart().length);
+
+section("EN · preference memory carries across needs");
+E.reset();
+turn("I don't like sweet drinks");
+ok("  \"don't like sweet\" persisted to profile", E.C().profile.notSweet === true, E.C().profile.notSweet);
+r = turn("I'm thirsty");
+ok("  later \"thirsty\" avoids sugary juice", r.kind === "recommend" && r.rec.sugar_level !== "high", { name: rec(r), sugar: r.rec && r.rec.sugar_level });
+
+section("EN · references, options + ordinal, refine loop");
+E.reset();
+turn("I want a gift");
+r = turn("the pink one instead");
+ok("  \"the pink one instead\" -> pink item chosen", /pink/i.test(rec(r)) || cartHas(/pink/i), { rec: rec(r), cart: cart().map(i => i.name) });
+E.reset();
+turn("I want a gift");
+r = turn("what else do you have");
+ok("  \"what else\" -> options list", r.kind === "options" && r.options.length >= 1, r.kind);
+r = turn("the second one");
+ok("  \"the second one\" -> reselect 2nd option", r.kind === "recommend" && r.reselect === true, r.kind);
+E.reset();
+turn("something fruity");
+r = turn("too sweet");
+ok("  \"too sweet\" re-ranks to a less-sweet pick", r.kind === "recommend" && r.rec.sweetness <= 3, { name: rec(r), sw: r.rec && r.rec.sweetness });
+
+section("EN · negation");
+E.reset();
+r = turn("no juice, just water");
+ok("  \"no juice, just water\" -> a water, not a juice", r.kind === "recommend" && !/Juice/i.test(rec(r)), rec(r));
+
+/* ============================ FIXES ============================ */
+section("FIX · checkout is honoured from ANY state (was a bug in RECOMMEND)");
+E.reset();
+turn("I want a gift"); turn("sure");                 // add a gift -> POST_ADD
+turn("actually something fruity");                   // new need -> RECOMMEND, cart still holds the gift
+ok("  precondition: mid-recommendation with a full cart", state() === "RECOMMEND" && cart().length === 1, { state: state(), cart: cart().length });
+r = turn("check me out");                            // exactly what the always-enabled Checkout button sends
+ok("  checkout while a recommendation is on screen -> checkout", r.kind === "checkout", r.kind);
+ok("  cart cleared", cart().length === 0, cart().length);
+
+section("FIX · strong checkout with an empty cart is graceful (not an LLM escalation)");
+E.reset();
+r = turn("check me out");
+ok("  empty-cart checkout -> a spoken reply, not escalate", r.kind === "say", r.kind);
+
+section("FIX · \"you pick\" after adding an item recommends (was a clarify fall-through)");
+E.reset();
+turn("I want water"); turn("sure");                  // POST_ADD
+r = turn("you pick");
+ok("  \"you pick\" in POST_ADD -> recommend", r.kind === "recommend", r.kind);
+
+section("FIX · middle sweetness tier: \"a little sweet\" -> ceiling 3 (not wantSweet, not notSweet)");
+let mid = E.extract("something a little sweet");
+ok("  \"a little sweet\" -> max_sweetness 3", mid.max_sweetness === 3, mid.max_sweetness);
+ok("  \"a little sweet\" -> not wantSweet, not notSweet", mid.wantSweet === false && mid.notSweet === false, { want: mid.wantSweet, not: mid.notSweet });
+ok("  ideal sweetness for that tier == 3", E.ideal(mid, ["fruit_refreshment"]) === 3, E.ideal(mid, ["fruit_refreshment"]));
+let hi = E.extract("make it very sweet");
+ok("  \"very sweet\" -> wantSweet (unchanged)", hi.wantSweet === true && hi.max_sweetness === null, { want: hi.wantSweet, max: hi.max_sweetness });
+let lo = E.extract("nothing sweet please");
+ok("  \"nothing sweet\" -> notSweet + ceiling 2 (unchanged)", lo.notSweet === true && lo.max_sweetness === 2, { not: lo.notSweet, max: lo.max_sweetness });
+
+section("FIX · POST_ADD: \"one more\" / \"N more\" re-adds the last item (was escalate)");
+E.reset(); turn("I want water"); turn("sure");
+r = turn("one more");
+ok("  \"one more\" -> added again", r.kind === "added", r.kind);
+ok("  cart line qty now 2", cart()[0] && cart()[0].qty === 2, cart().map(i => ({ n: i.name, q: i.qty })));
+E.reset(); turn("I want water"); turn("sure");
+turn("two more");
+ok("  \"two more\" -> qty 3 total", cart()[0] && cart()[0].qty === 3, cart()[0] && cart()[0].qty);
+
+section("FIX · POST_ADD: browse intents don't check out (was checkout + cleared cart)");
+["something else", "what else do you have", "anything else"].forEach(m => {
+  E.reset(); turn("I want water"); turn("sure");
+  r = turn(m);
+  ok("  \"" + m + "\" -> not checkout, cart intact", r.kind !== "checkout" && cart().length === 1, { kind: r.kind, cart: cart().length });
+});
+["no thanks", "no", "i'm done"].forEach(m => {
+  E.reset(); turn("I want water"); turn("sure");
+  r = turn(m);
+  ok("  \"" + m + "\" -> checkout", r.kind === "checkout", r.kind);
+});
+
+section("FIX · RECOMMEND: product questions answered precisely, rec unchanged (was misread as constraints)");
+function ask(q) { E.reset(); turn("something fruity"); const before = E.C().need.currentRec.id; const rr = turn(q); return { rr, unchanged: E.C().need.currentRec.id === before }; }
+let a = ask("is it cold?");
+ok("  \"is it cold?\" -> say, rec unchanged, mentions temperature", a.rr.kind === "say" && a.unchanged && /chilled|frozen|room temp/i.test(a.rr.text), { kind: a.rr.kind, unchanged: a.unchanged, text: a.rr.text });
+a = ask("how much sugar does it have?");
+ok("  \"how much sugar?\" -> mentions sugar", a.rr.kind === "say" && /sugar/i.test(a.rr.text), a.rr.text);
+a = ask("does it have caffeine?");
+ok("  \"caffeine?\" -> caffeine-free", a.rr.kind === "say" && /caffeine-free/i.test(a.rr.text), a.rr.text);
+a = ask("how many calories?");
+ok("  \"calories?\" -> kcal figure", a.rr.kind === "say" && /kcal|calorie/i.test(a.rr.text), a.rr.text);
+a = ask("whats in it?");
+ok("  \"what's in it?\" -> a real description", a.rr.kind === "say" && a.rr.text.length > 12, a.rr.text);
+
+section("FIX · caffeine request is answered honestly (nothing caffeinated is stocked)");
+["do you have anything with caffeine", "something with caffeine", "I need a pick-me-up with caffeine", "wake me up"].forEach(m => {
+  E.reset();
+  r = turn(m);
+  ok("  \"" + m + "\" -> honest 'no caffeine' reply, not a random rec", r.kind === "say" && /caffeinated/i.test(r.text), { kind: r.kind, text: (r.text || "").slice(0, 40) });
+});
+{ E.reset(); const rr = turn("some water with no caffeine");   // a "no caffeine" request is satisfiable — must NOT hit the no-caffeine reply
+  ok("  \"no caffeine\" is satisfiable -> recommend, not the no-caffeine notice", rr.kind === "recommend" && !/caffeinated/i.test(rr.text || ""), { kind: rr.kind }); }
+ok("  YES_CAF sets caffeine=true constraint (future-proof)", E.extract("something with caffeine").caffeine === true, E.extract("something with caffeine").caffeine);
+
+section("FIX · \"anything with X\" is no longer mistaken for \"surprise me\"");
+{
+  E.reset(); const r1 = turn("do you have anything with caffeine");
+  ok("  routed to caffeine reply, not a surprise recommendation", r1.kind === "say" && /caffeinated/i.test(r1.text), r1.kind);
+  E.reset(); ok("  \"surprise me\" still recommends", turn("surprise me").kind === "recommend", turn("surprise me").kind);
+  E.reset(); ok("  \"anything is fine\" still recommends", turn("anything is fine").kind === "recommend", turn("anything is fine").kind);
+}
+
+/* ============================ ESCALATION ============================ */
+section("EN · genuinely unrecognized input escalates to the LLM");
+["I had a really rough day at the office", "do you accept credit cards", "tell me a joke"].forEach(m => {
+  E.reset();
+  ok("  \"" + m + "\" -> escalate", turn(m).kind === "escalate");
+});
+
+section("EN · small talk & recognized meta stay on the rules (no escalation)");
+[["hi", "say"], ["thanks", "say"], ["what do you have", "say"], ["surprise me", "recommend"], ["not sweet", "say"]].forEach(([m, k]) => {
+  E.reset();
+  ok("  \"" + m + "\" -> " + k, turn(m).kind === k, turn(m).kind);
+});
+
+/* ============================ 中文 ============================ */
+section("中文 · recognized turns stay on the rules; unrecognized escalates");
+E.setLang("zh");
+E.reset();
+r = turn("刚健身完，不要太甜");   // just worked out, not too sweet
+ok("  workout+not-sweet -> electrolyte", r.kind === "recommend" && /Electrolyte/i.test(rec(r)), rec(r));
+E.reset();
+r = turn("来两个");                                       // "make it two" (needs a current rec first)
+E.reset();
+turn("我想要水"); r = turn("来两瓶");     // I want water; two bottles
+ok("  中文 quantity \"来两瓶\" -> added 2", r.kind === "added" && r.qty === 2, { kind: r.kind, qty: r.qty });
+E.reset();
+r = turn("结账");                                             // checkout, empty cart
+ok("  中文 empty checkout -> graceful say", r.kind === "say", r.kind);
+E.reset();
+ok("  中文 unrecognized \"今天天气真好\" -> escalate", turn("今天天气真好").kind === "escalate");
+
+section("LLM streaming: partialMessage extracts the message field as JSON streams in");
+ok("  message field not started -> null", E.partialMessage('{"action":"recommend","sku":"evian') === null);
+ok("  partial message rendered", E.partialMessage('{"action":"recommend","message":"If you just wa') === "If you just wa");
+ok("  closing quote ends the message", E.partialMessage('{"action":"recommend","message":"Here you go.","sku":"x"}') === "Here you go.");
+ok("  unescapes \\n mid-stream", E.partialMessage('{"message":"line1\\nline2') === "line1\nline2");
+
+section("LLM streaming: simulated token stream renders progressively, then parses to an action");
+{
+  const finalJSON = '{"action":"recommend","sku":"evian_natural_mineral_water","message":"Evian is pure, zero-sugar water — shall I grab one?"}';
+  const chunks = []; for (let i = 0; i < finalJSON.length; i += 7) chunks.push(finalJSON.slice(i, i + 7));  // arbitrary token-ish chunks
+  let content = "", frames = [];
+  for (const ch of chunks) { content += ch; const pm = E.partialMessage(content); if (pm) frames.push(pm); }
+  const parsed = JSON.parse(content);
+  ok("  accumulated content parses to the action", parsed.action === "recommend" && parsed.sku === "evian_natural_mineral_water", { action: parsed.action, sku: parsed.sku });
+  ok("  message rendered progressively (frames grow)", frames.length > 3 && frames[0].length < frames[frames.length - 1].length, { n: frames.length, first: frames[0], last: frames[frames.length - 1] });
+  ok("  final frame equals the complete message", frames[frames.length - 1] === parsed.message, frames[frames.length - 1]);
+}
+
+/* ============================ RESULT ============================ */
+console.log("\n" + "=".repeat(52));
+console.log("RESULT: " + pass + " passed, " + fail + " failed" + (fail ? " — " + failures.join("; ") : ""));
+console.log("=".repeat(52));
+process.exit(fail ? 1 : 0);
