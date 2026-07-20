@@ -76,7 +76,7 @@
   .bub .typing span{display:inline-block;width:6px;height:6px;margin:0 1px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite both;}
   .bub .typing span:nth-child(2){animation-delay:.2s;} .bub .typing span:nth-child(3){animation-delay:.4s;}
   @keyframes blink{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
-  .bub .caret{display:inline-block;margin-left:1px;color:var(--muted);animation:blink 1s infinite;}
+  .bub .caret{display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:text-bottom;background:var(--ink-2);animation:blink 1s infinite;}
 
   .composer{border-top:1px solid var(--line);padding:11px;display:flex;flex-direction:column;gap:9px;background:var(--panel-2);}
   .chips{display:flex;gap:7px;flex-wrap:wrap;}
@@ -262,7 +262,7 @@ const LX={
     greetReply:()=>pick(["Hey! What are you after — a drink, a treat, or a gift? 🥤","Hi there! Thirsty, or in the mood for something sweet or fun?","Hello! Tell me what you feel like and I'll sort you out."]),
     exit:hadCart=>hadCart?"No problem — I've cleared the cart. Come back anytime! 👋":"Come back anytime! 👋",
     fallback:()=>pick(["Sorry, could you say that another way?","Hmm, I didn't quite catch that — a drink, a treat, or a gift?"]),
-    offer:(p,f,notSweet,inCart)=>{const lead=notSweet?pick(["Since you'd rather skip the sugar, ","No sugar rush here — "]):f==="rehydration_electrolytes"?pick(["Since you've been working hard, ","Perfect for bouncing back — "]):f==="treat_dessert"?pick(["For a little treat, ","Time to spoil yourself — "]):f==="gift_novelty"?pick(["For something fun to give, ","A great little surprise — "]):f==="fruit_refreshment"?pick(["If you're after something fruity, ","For a bright, fruity pick — "]):pick(["Good call — ","Here's a solid pick — "]);const ask=pick(inCart?["Want me to add it?","Add it to the cart?","Shall I pop it in?"]:["Shall I get one for you?","Want me to grab it?","Sound good?"]);return {pre:lead+p.blurb,ask};}
+    offer:(p,f,notSweet,inCart)=>{const lead=f==="gift_novelty"?pick(["For something fun to give, ","A great little surprise — "]):f==="treat_dessert"?pick(["For a little treat, ","Time to spoil yourself — "]):notSweet?pick(["Since you'd rather skip the sugar, ","No sugar rush here — "]):f==="rehydration_electrolytes"?pick(["Since you've been working hard, ","Perfect for bouncing back — "]):f==="fruit_refreshment"?pick(["If you're after something fruity, ","For a bright, fruity pick — "]):pick(["Good call — ","Here's a solid pick — "]);const ask=pick(inCart?["Want me to add it?","Add it to the cart?","Shall I pop it in?"]:["Shall I get one for you?","Want me to grab it?","Sound good?"]);return {pre:lead+p.blurb,ask};}
   },
   zh:{
     ui:{chat:"聊天机器人",reason:"推理 · 草稿",session:"会话记忆与购物车",prefs:"记住的偏好",cart:"购物车",checkout:"结账",inv:"门店库存",send:"发送",placeholder:"告诉机器人你想要点什么…",empty:"空",noneYet:"暂无",reasonPlaceholder:"机器人每一轮的推理（需求 → 功能 → 约束 → 候选）都会显示在这里。",
@@ -281,7 +281,7 @@ const LX={
     pair:pair=>{const s=new Set(pair);return s.has("gift_novelty")?"是自己用，还是想挑个礼物 / 好玩的送人？":s.has("treat_dessert")?"想喝点解渴的，还是更想来点甜品？":s.has("fruit_refreshment")?"想要清爽的白水，还是果味饮料？":"你更看重哪一点 —— 补水、口味，还是甜点？";},
     noMatch:"抱歉，暂时没有完全合适的现货。要不要换一类饮料或甜点试试？",
     cartEmptyElicit:"购物车是空的 —— 想来点什么呢？",
-    added:(name,qty,capped)=>`${pick(["好啦 ——","没问题 ——","收到 ——"])} <b>${esc(name)}</b> ×${qty} 已加入购物车。${capped?"（库存只有这么多了）":""} ${pick(["还要别的吗，还是现在结账？","要不要再加点，或者结账？","还需要点什么吗？"])}`,
+    added:(name,qty,capped)=>`${pick(["好啦——","没问题——","收到——"])}<b>${esc(name)}</b> ×${qty} 已加入购物车。${capped?"（库存只有这么多了）":""}${pick(["还要别的吗，还是现在结账？","要不要再加点，或者结账？","还需要点什么吗？"])}`,
     removed:name=>`已${pick(["移除","去掉"])} <b>${esc(name)}</b>。还要别的吗？`,
     options:list=>`给你几个选择：<ol>${list.map(p=>`<li><b>${esc(pname(p))}</b> —— ${ZH_SUG[p.sugar_level]}、${ZH_SERV[p.served]}</li>`).join("")}</ol>要哪一个？可以说"第一个"或直接说名字。`,
     planRow:(dir,qty,ett,name)=>`<div>向<b>${dir}</b>转 → 抓取 <b>×${qty}</b>${ett?` <span style="color:var(--accent)">（${ett} 行为树）</span>`:""} · ${esc(name)}</div>`,
@@ -291,7 +291,7 @@ const LX={
       const swd=p.sweetness===0?"完全不甜":p.sweetness<=2?"几乎不甜":p.sweetness<=3?"中等甜度":"比较甜";
       const body=({sweet:`它${swd}，${ZH_SUG[p.sugar_level]}（甜度 ${p.sweetness}/5）。`,temp:`它是${ZH_SERV[p.served]}的。`,caffeine:p.caffeine?"含咖啡因。":"不含咖啡因。",calories:p.calories_kcal>0?`大约 ${p.calories_kcal} 千卡。`:"零卡路里。",ingredients:`这是一款${ZH_CAT[p.category]||p.category}，${swd}，${ZH_SUG[p.sugar_level]}。`,stock:`库存还有 ${p.qty} 个。`})[topic]||`这是一款${ZH_CAT[p.category]||p.category}。`;
       const ask=C.cart.length?pick(["要加入购物车吗？","帮你加上？"]):pick(["要我帮你拿一个吗？","来一个？"]);
-      return `${body} ${ask}`;},
+      return `${body}${ask}`;},
     thanks:()=>pick(["不客气！还要别的吗？😊","随时为你服务！还需要点什么？","不用谢～还需要我帮忙吗？"]),
     thanksPost:()=>pick(["不客气！还要别的吗，还是结账？","随时～再加点，还是现在结账？"]),
     help:'我们有 <b>饮料</b> —— 白水、NFC 果汁、清爽的电解质水，一份 <b>冷冻甜点</b>（冰淇淋），还有 <b>礼物</b>（盲盒和收藏摆件）。想来点什么？也可以直接说 <i>"随便推荐一个"</i>。',
@@ -299,7 +299,7 @@ const LX={
     greetReply:()=>pick(["嗨！想来点什么 —— 饮料、甜点，还是礼物？🥤","你好！口渴了，还是想来点甜的或好玩的？","你好呀！告诉我你想要什么，我来帮你搞定。"]),
     exit:hadCart=>hadCart?"没问题 —— 购物车已清空。欢迎下次再来！👋":"欢迎下次再来！👋",
     fallback:()=>pick(["抱歉，能换个说法吗？","嗯…我没太听懂 —— 是想要饮料、甜点，还是礼物？"]),
-    offer:(p,f,notSweet,inCart)=>{const reason=notSweet?"清爽不甜":f==="rehydration_electrolytes"?"帮你快速补水、补充电解质":f==="treat_dessert"?"冰凉香甜，好好犒劳自己":f==="gift_novelty"?"拿来送人很有惊喜感":f==="fruit_refreshment"?"果味十足、很清爽":"很稳的选择";const lead=pick(["我推荐","不如试试","给你选了","可以看看"]);const ask=pick(inCart?["要加入购物车吗？","帮你加上？","放进去？"]:["要我帮你拿一个吗？","来一个？","这个可以吗？"]);return {pre:`${lead} ${pname(p)} —— ${reason}。`,ask};}
+    offer:(p,f,notSweet,inCart)=>{const reason=f==="gift_novelty"?"拿来送人很有惊喜感":f==="treat_dessert"?"冰凉香甜，好好犒劳自己":notSweet?"清爽不甜":f==="rehydration_electrolytes"?"帮你快速补水、补充电解质":f==="fruit_refreshment"?"果味十足、很清爽":"很稳的选择";const lead=pick(["我推荐","不如试试","给你选了","可以看看"]);const ask=pick(inCart?["要加入购物车吗？","帮你加上？","放进去？"]:["要我帮你拿一个吗？","来一个？","这个可以吗？"]);return {pre:`${lead} ${pname(p)} —— ${reason}。`,ask};}
   }
 };
 
@@ -510,7 +510,15 @@ function partialMessage(s){
   let out="";
   for(let i=m.index+m[0].length;i<s.length;i++){
     const c=s[i];
-    if(c==="\\"){const n=s[i+1];if(n===undefined)break;out+=n==="n"?"\n":n==="t"?"\t":n;i++;}
+    if(c==="\\"){
+      const n=s[i+1];
+      if(n===undefined)break;
+      if(n==="u"){                                   // \uXXXX → real char (so escaped Chinese never shows as "u4f60")
+        const hex=s.slice(i+2,i+6);
+        if(hex.length<4||/[^0-9a-fA-F]/.test(hex))break;   // incomplete escape → wait for more tokens
+        out+=String.fromCharCode(parseInt(hex,16));i+=5;
+      }else{out+=n==="n"?"\n":n==="t"?"\t":n==="r"?"\r":n==="b"?"\b":n==="f"?"\f":n;i++;}   // \" \\ \/ etc → the char itself
+    }
     else if(c==='"')break;   // closing quote → message complete
     else out+=c;
   }
@@ -567,7 +575,13 @@ function doRank(reason){
       :(need.constraints.served_in.length&&!need.constraints.served_in.includes(p.served))?`served ${p.served} ≠ wanted`:"not in top set";
     return `${p.name} — ${why}`;});
   if(need.candidates.length===0){
-    if(need.constraints.max_sweetness!=null){need.constraints.max_sweetness=Math.min(5,need.constraints.max_sweetness+1);reason.decision="no match → relax sweetness +1";C.lastReason=reason;return doRank({need:need.rawUtterance,scores:need.scores,fns:[...need.functions],constraints:{...need.constraints},candidates:[],exclusions:[],decision:"",inv:""});}
+    const c=need.constraints;
+    const retry=d=>{reason.decision="no match → "+d;C.lastReason=reason;return doRank({need:need.rawUtterance,scores:need.scores,fns:[...need.functions],constraints:{...c},candidates:[],exclusions:[],decision:"",inv:""});};
+    // relax ONE constraint at a time, softest first, until something fits or nothing is left — each branch makes
+    // progress (empties served_in / clears caffeine / +1 sweetness up to 5), so this always terminates.
+    if(c.served_in.length){c.served_in=[];return retry("relax temperature");}
+    if(c.caffeine!=null){c.caffeine=null;return retry("relax caffeine");}
+    if(c.max_sweetness!=null&&c.max_sweetness<5){c.max_sweetness++;return retry("relax sweetness +1");}
     reason.decision="no_match";C.lastReason=reason;C.state="ELICIT_NEED";
     return {kind:"say",text:L().noMatch};
   }
@@ -883,7 +897,7 @@ async function respondLLM(raw){
   try{
     // First escalation loads the model (~1 GB, cached afterwards) — show download progress in the bubble.
     const engine=await loadLLM(p=>{const pct=Math.round(((p&&p.progress)||0)*100);
-      bub.innerHTML=esc((zh()?"正在加载浏览器内 AI…":"Loading the in-browser AI…")+" "+pct+"%")+'<span class="caret">▌</span>';});
+      bub.innerHTML=esc((zh()?"正在加载浏览器内 AI…":"Loading the in-browser AI…")+" "+pct+"%")+'<span class="caret"></span>';});
     const cartStr=C.cart.length?C.cart.map(i=>`${i.qty}x ${i.name}`).join(", "):"empty";
     const messages=[{role:"system",content:sysPrompt()},...ollHistory,{role:"user",content:`[current cart: ${cartStr}]\n\nShopper: ${raw}`}];
     // Stream so the reply types out live as the in-browser model generates it.
@@ -894,10 +908,11 @@ async function respondLLM(raw){
       if(!d)continue;
       content+=d;
       const partial=partialMessage(content);            // extract the message field as it fills in
-      if(partial){bub.innerHTML=esc(partial)+'<span class="caret">▌</span>';msgsEl.scrollTop=msgsEl.scrollHeight;}
+      if(partial){bub.innerHTML=esc(partial)+'<span class="caret"></span>';msgsEl.scrollTop=msgsEl.scrollHeight;}
     }
     let a;try{a=JSON.parse(content);}catch(e){throw new Error("non-JSON reply");}   // full JSON action, now complete
     ollHistory.push({role:"user",content:raw});ollHistory.push({role:"assistant",content:a.message||"(ok)"});
+    if(ollHistory.length>8)ollHistory.splice(0,ollHistory.length-8);   // keep only recent turns so the prompt stays small (fast prefill)
     const r=applyAction(a);
     let html=esc(r.text||"")+(r.rec?recCard(r.rec):"");
     if(r.checkout){const plan=r.checkout.map(i=>L().planRow(zh()?DIRW_ZH[i.location.turn_direction]:DIRW[i.location.turn_direction],i.qty,i.ett,pname(byId(i.id)))).join("");html=esc(r.text||"")+`<div class="plan">${plan}</div>`;}

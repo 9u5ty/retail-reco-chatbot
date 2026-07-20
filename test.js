@@ -39,6 +39,17 @@ const driver = `; globalThis.__engine = {
   ideal: function(c, fns){ return idealSweet(c, fns); },
   extract: function(t){ const c = blankConstraints(); extractInto(c, normalize(t)); return c; },
   partialMessage: function(s){ return partialMessage(s); },
+  // set up a need whose constraints leave ZERO candidates (caffeine wanted + sweetness ceiling) and run the ranker;
+  // the old relax loop spun forever on this — must now terminate with a valid result.
+  noMatchTerminates: function(){
+    C = newConvo();
+    C.need = newNeed();
+    C.need.functions = ["gift_novelty", "fruit_refreshment"];
+    C.need.constraints.caffeine = true;   // nothing is caffeinated
+    C.need.constraints.max_sweetness = 2; // and a ceiling → the two together used to loop
+    C.need.rawUtterance = "";
+    return doRank({ need: "", scores: {}, fns: [...C.need.functions], constraints: { ...C.need.constraints }, candidates: [], exclusions: [], decision: "", inv: "" });
+  },
 };`;
 // eslint-disable-next-line no-eval
 eval(prelude + engine + driver);
@@ -237,6 +248,18 @@ section("LLM streaming: simulated token stream renders progressively, then parse
   ok("  message rendered progressively (frames grow)", frames.length > 3 && frames[0].length < frames[frames.length - 1].length, { n: frames.length, first: frames[0], last: frames[frames.length - 1] });
   ok("  final frame equals the complete message", frames[frames.length - 1] === parsed.message, frames[frames.length - 1]);
 }
+
+section("FIX · ranker relax always terminates (no infinite recursion / stack overflow)");
+{
+  let threw = false, r = null;
+  try { r = E.noMatchTerminates(); } catch (e) { threw = true; }
+  ok("  empty-candidate no-match terminates with a result", !threw && r && (r.kind === "recommend" || r.kind === "say"), threw ? "THREW/looped" : (r && r.kind));
+}
+
+section("FIX · streaming parser decodes \\uXXXX (no 'u4f60' garble in Chinese)");
+ok("  \\u4f60\\u597d -> 你好", E.partialMessage('{"message":"\\u4f60\\u597d world') === "你好 world", E.partialMessage('{"message":"\\u4f60\\u597d world'));
+ok("  incomplete \\u waits (no garbage)", E.partialMessage('{"message":"hi \\u4f') === "hi ", JSON.stringify(E.partialMessage('{"message":"hi \\u4f')));
+ok("  raw Chinese streams through untouched", E.partialMessage('{"action":"reply","message":"你好，需要') === "你好，需要", E.partialMessage('{"action":"reply","message":"你好，需要'));
 
 /* ============================ RESULT ============================ */
 console.log("\n" + "=".repeat(52));
