@@ -149,6 +149,53 @@ E.reset();
 r = turn("do you have an energy drink");
 ok("  \"energy drink\" -> honest no-caffeine reply (unchanged)", r.kind === "say" && /caffeinated/i.test(r.text), { kind: r.kind, text: (r.text || "").slice(0, 40) });
 
+section("FIX · hunger/food maps to the only edible item (ice cream), not the LLM");
+["i'm hungry", "something to eat", "i want food", "我饿了", "想吃东西"].forEach(m => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> recommend Ice Cream (not escalate)", r.kind === "recommend" && /Ice Cream/i.test(rec(r)), { kind: r.kind, rec: rec(r) });
+});
+
+section("FIX · money / payment / logistics get an honest fixed reply, never an LLM-invented price");
+[["how much is it", /demo|price/i], ["what's the price", /demo|price/i], ["do you take apple pay", /machine|pay/i]].forEach(([m, re]) => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> a spoken honest reply (not escalate/rec)", r.kind === "say" && re.test(r.text), { kind: r.kind, text: (r.text || "").slice(0, 40) });
+});
+E.setLang("zh");
+[["多少钱", /演示|价格/], ["怎么付款", /机器|付款/]].forEach(([m, re]) => {
+  E.reset(); r = turn(m);
+  ok("  中文 \"" + m + "\" -> honest zh reply", r.kind === "say" && re.test(r.text), { kind: r.kind, text: (r.text || "").slice(0, 30) });
+});
+E.setLang("en");
+
+section("FIX · health/diet lean → the plain zero-sugar water, not an escalation");
+["i'm diabetic", "something low calorie", "what's the healthiest option", "which has the least sugar", "哪个糖最少"].forEach(m => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> recommend Evian water", r.kind === "recommend" && /Evian|Water/i.test(rec(r)) && r.rec.sugar_level !== "high", { kind: r.kind, rec: rec(r) });
+});
+
+section("FIX · we stock nothing hot/room-temp — say so honestly instead of handing over a chilled water");
+["a hot drink", "something warm", "来个热的", "要常温的"].forEach(m => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> honest 'chilled/frozen only' reply", r.kind === "say" && /(chilled|frozen|冷藏|冷冻)/i.test(r.text), { kind: r.kind, text: (r.text || "").slice(0, 30) });
+});
+// but weather talk like "hot day" is a hydration cue and must NOT trip the no-hot reply
+E.reset(); r = turn("it's a hot day, something to drink");
+ok("  \"hot day ... to drink\" -> a drink, not the no-hot notice", r.kind === "recommend", { kind: r.kind, rec: rec(r) });
+
+section("FIX · a named product/brand/flavour is recommended directly, in BOTH languages (was: orange for 芒果, or a needless clarify)");
+[["要芒果汁", /Mango/i], ["石榴电解质水", /Pomegranate/i], ["农夫山泉", /Nongfu|Juice/i], ["依云", /Evian/i],
+ ["the mango one", /Mango/i], ["a pomegranate electrolyte", /Pomegranate/i], ["evian", /Evian/i]].forEach(([m, re]) => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> recommend the named item", r.kind === "recommend" && re.test(rec(r)), { kind: r.kind, rec: rec(r) });
+});
+
+section("FIX · contraction & vague-mood openers stay on the rules (apostrophe-insensitive)");
+E.reset(); ok("  \"i don't know what i want\" -> recommend", turn("i don't know what i want").kind === "recommend");
+E.reset(); ok("  \"cheer me up\" -> recommend", turn("cheer me up").kind === "recommend");
+E.reset(); ok("  \"what's most popular\" -> recommend", turn("what's most popular").kind === "recommend");
+E.reset(); ok("  bare filler \"hmm\" -> gentle re-prompt (say, not escalate)", turn("hmm").kind === "say");
+E.reset(); ok("  quantity-only \"give me three\" -> ask what (say, not escalate)", turn("give me three").kind === "say");
+
 /* ============================ FIXES ============================ */
 section("FIX · checkout is honoured from ANY state (was a bug in RECOMMEND)");
 E.reset();

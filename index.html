@@ -259,6 +259,8 @@ const LX={
     thanksPost:()=>pick(["You're welcome! Anything else, or shall I check you out?","Anytime! Add anything else, or ready to check out?"]),
     help:'I\'ve got <b>drinks</b> — plain water, NFC fruit juices, and light electrolyte waters — a <b>frozen treat</b> (ice cream), and <b>gifts</b> (blind boxes &amp; collectibles). What sounds good? You can also just say <i>"surprise me"</i>.',
     noCaffeine:"Sorry, we don't stock anything caffeinated at the moment. A chilled juice or a light electrolyte water still makes a refreshing pick-me-up, though — what sounds good?",
+    info:topic=>({price:"This is a live demo, so prices aren't shown here — every item is a single serving straight from the machine. Want me to recommend something?",pay:"You'll pay right at the machine when you check out — no need to sort that out with me. What can I get you?",location:"I'm the vending robot itself — just tell me what you'd like and I'll dispense it. What sounds good?"})[topic]||"",
+    noHot:"Everything here is served chilled or frozen — I don't have any hot or room-temperature drinks, sorry. A crisp chilled water or juice hits the spot though — want one?",
     greetReply:()=>pick(["Hey! What are you after — a drink, a treat, or a gift? 🥤","Hi there! Thirsty, or in the mood for something sweet or fun?","Hello! Tell me what you feel like and I'll sort you out."]),
     exit:hadCart=>hadCart?"No problem — I've cleared the cart. Come back anytime! 👋":"Come back anytime! 👋",
     fallback:()=>pick(["Sorry, could you say that another way?","Hmm, I didn't quite catch that — a drink, a treat, or a gift?"]),
@@ -296,6 +298,8 @@ const LX={
     thanksPost:()=>pick(["不客气！还要别的吗，还是结账？","随时～再加点，还是现在结账？"]),
     help:'我们有 <b>饮料</b> —— 白水、NFC 果汁、清爽的电解质水，一份 <b>冷冻甜点</b>（冰淇淋），还有 <b>礼物</b>（盲盒和收藏摆件）。想来点什么？也可以直接说 <i>"随便推荐一个"</i>。',
     noCaffeine:"抱歉，我们目前没有含咖啡因的饮品。不过冷藏果汁或清爽的电解质水也很提神解渴 —— 想来点什么？",
+    info:topic=>({price:"这是一个演示，这里暂不显示价格 —— 每件都是机器现出的单份商品。要我帮你推荐一个吗？",pay:"结账时在机器上直接付款就行，不用跟我处理这些。想来点什么呢？",location:"我就是这台自动贩卖机器人 —— 告诉我你想要什么，我来出货。想要点什么？"})[topic]||"",
+    noHot:"这里的商品都是冷藏或冷冻的 —— 暂时没有热饮或常温的饮料，抱歉。冰凉的矿泉水或果汁也很解渴哦 —— 要来一瓶吗？",
     greetReply:()=>pick(["嗨！想来点什么 —— 饮料、甜点，还是礼物？🥤","你好！口渴了，还是想来点甜的或好玩的？","你好呀！告诉我你想要什么，我来帮你搞定。"]),
     exit:hadCart=>hadCart?"没问题 —— 购物车已清空。欢迎下次再来！👋":"欢迎下次再来！👋",
     fallback:()=>pick(["抱歉，能换个说法吗？","嗯…我没太听懂 —— 是想要饮料、甜点，还是礼物？"]),
@@ -309,8 +313,8 @@ const CUES={
   rehydration_electrolytes:{strong:["post-workout","post workout","after my workout","after the gym","worked out","working out","just finished working out","gym","workout","exercise","exercised","sweat","sweaty","sweating","electrolyte","electrolytes","recovery","recover","rehydrate","rehydration","dehydrated","dehydration","cramp","cramping","hangover","leg day","gymming","运动","运动后","刚运动","健身","锻炼","锻练","出汗","流汗","电解质","补水","恢复","脱水","抽筋","宿醉","跑步","跑完","补充电解质"],support:["run","ran","running","jog","jogging","hike","hiking","train","training","marathon","spin","yoga","tired","exhausted","wiped","replenish","salts","minerals","sports","sport","gatorade","bounce back","worn out","累","很累","流了汗"]},
   hydration:{strong:["thirsty","parched","hydrate","hydration","plain water","just water","still water","drink of water","dry mouth","quench","some water","bottle of water","口渴","渴了","渴","解渴","喝水","白水","矿泉水","来点水","要水","纯净水"],support:["water","something light","light","lighter","nothing heavy","simple","clean","refreshing","refresh","no calories","zero calorie","zero sugar","hot day","its hot","healthy","diet","水","清爽","清淡","健康","无糖"]},
   fruit_refreshment:{strong:["juice","fruity","fruit","smoothie","orange juice","fruit drink","something fruity","berry","mango","peach","citrus","guava","tropical","fruit juice","nfc","果汁","果味","水果","橙汁","芒果汁","番石榴","榨汁","果味饮料"],support:["refreshment","tangy","zesty","pulp","vitamin","vitamins","breakfast","brunch","flavour","flavor","flavoured","flavored","zingy","juicy","酸甜","维生素"]},
-  treat_dessert:{strong:["dessert","ice cream","ice-cream","icecream","gelato","sorbet","popsicle","treat","sweet treat","indulge","indulgent","sundae","milkshake","pudding","甜品","甜点","冰淇淋","雪糕","冰激凌","甜食","犒劳","嘴馋","冷饮"],support:["cold","icy","after dinner","snack","peckish","reward","chocolate","creamy","rich","decadent","frozen","craving","sweet tooth","spoil","冰的","凉的","解馋","奖励自己"]},
-  gift_novelty:{strong:["gift","present","for a friend","for my","collectible","collectable","collector","limited edition","novelty","surprise","souvenir","blind box","blindbox","mystery box","stocking stuffer","birthday","figurine","figure","礼物","礼品","盲盒","收藏","手办","惊喜","送人","送朋友","送礼","生日礼物","摆件"],support:["fun","cute","quirky","unique","special","fancy","party","toy","mystery","kids","kid","nephew","niece","give","好玩","可爱","小孩","侄子","外甥","送给"]}
+  treat_dessert:{strong:["dessert","ice cream","ice-cream","icecream","gelato","sorbet","popsicle","treat","sweet treat","indulge","indulgent","sundae","milkshake","pudding","甜品","甜点","冰淇淋","雪糕","冰激凌","甜食","犒劳","嘴馋","冷饮"],support:["cold","icy","after dinner","snack","snacks","peckish","hungry","eat","food","bite","reward","chocolate","creamy","rich","decadent","frozen","craving","sweet tooth","spoil","冰的","凉的","解馋","奖励自己","饿","饿了","想吃","吃的","零食"]},
+  gift_novelty:{strong:["gift","present","for a friend","for my","collectible","collectable","collector","limited edition","novelty","surprise","souvenir","blind box","blindbox","mystery box","stocking stuffer","birthday","figurine","figure","礼物","礼品","盲盒","收藏","手办","惊喜","送人","送朋友","送礼","生日礼物","摆件"],support:["fun","cute","quirky","unique","special","fancy","party","toy","mystery","kids","kid","nephew","niece","好玩","可爱","小孩","侄子","外甥","送给"]}
 };
 const NOT_SWEET=["not sweet","no sugar","sugar free","sugar-free","unsweetened","less sweet","not too sweet","nothing sweet","don't want anything sweet","dont want anything sweet","low sugar","light on sugar","not sugary","without sugar","hate sweet","don't like sweet","dont like sweet","不甜","不要甜","别太甜","不太甜","无糖","少糖","低糖","没有糖","不想要甜","不喜欢甜","不要太甜"];
 const YES_SWEET=["really sweet","very sweet","super sweet","extra sweet","sugary","love sweet","nice and sweet","sweeter","something sweet","甜一点","很甜","要甜","甜的","喜欢甜"];
@@ -337,9 +341,17 @@ const DISTINCTIVE=["black","green","purple","pink","orange","blue","white grape"
 // preference statement like "I don't like sweet drinks" (plural) is NOT read as an order. When this is the
 // only signal we default to plain water — a drink request must never fall through to the LLM and come back a blind box.
 const GENERIC_DRINK=["drink","a drink","something to drink","get a drink","beverage","喝的","喝点","想喝","喝东西","来点喝的","来杯","饮料","饮品"];
+// Health / diet lean → plain water is the honest answer (Evian is 0 sugar, 0 kcal). Matched only when no
+// specific flavour/function was named, so "a healthy juice" still gives a juice.
+const HEALTH_LEAN=["low calorie","low-calorie","low cal","fewest calories","least calories","lowest calorie","low carb","keto","keto friendly","diabetic","for a diabetic","least sugar","lowest sugar","fewest sugar","light on calories","guilt free","healthiest option","most healthy","低卡","低热量","糖最少","糖最低","热量最低","减肥","糖尿病","最健康"];
+// A hot / room-temperature drink — we don't stock one (everything is chilled or frozen). Phrases only, so weather
+// talk like "hot day" (a hydration cue) never trips it. Answered honestly instead of handing over a chilled water.
+const HOT_WANT=["hot drink","a hot drink","warm drink","something warm","something hot","piping hot","hot chocolate","hot tea","hot coffee","热的","热饮","来个热的","温热的","热一点","room temperature","room temp","常温","室温","要常温"];
 
 const CJK=/[一-鿿]/;
-function normalize(t){return t.toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9'一-鿿\s-]/g," ").replace(/\s+/g," ").trim();}
+// Strip apostrophes so contractions collapse to the apostrophe-free forms the cue lists use
+// ("don't"→"dont", "i'm"→"im", "what's"→"whats") — otherwise smart/straight quotes silently miss cues.
+function normalize(t){return t.toLowerCase().replace(/[’‘'`´]/g,"").replace(/[^a-z0-9一-鿿\s-]/g," ").replace(/\s+/g," ").trim();}
 const _reCache=Object.create(null);   // phrase → compiled word-boundary regex, built once (regex compilation is costly)
 function has(text,phrase){
   if(CJK.test(phrase))return text.includes(phrase);
@@ -567,14 +579,23 @@ function infer(){
     need.functions=need.functions.filter(f=>BEVERAGE.includes(f)||need.scores[f]>=THRESHOLD);
     if(need.functions.length===0)need.functions=["hydration"];
   }
+  // Health / diet lean with no specific flavour → recommend the plain, zero-sugar water honestly.
+  if(need.functions.length===0&&anyHas(need.rawUtterance,HEALTH_LEAN)){
+    need.functions=["hydration"];need.constraints.notSweet=true;need.constraints.max_sweetness=2;need.constraints.prefer_sugar=["none","low"];
+  }
+  // A bare product/brand/flavour name with no function words ("evian", "农夫山泉", "the mango one") → adopt that
+  // item's own tags so doRank recommends it directly instead of asking a needless clarifying question.
+  let named=null;
+  if(need.functions.length===0){named=referencedProduct(need.rawUtterance,CATALOG);if(named)need.functions=[...named.function_tags];}
   extractInto(need.constraints,need.rawUtterance);
   persistPrefs(need.rawUtterance);
   const fns=need.functions;
   const reason={need:need.rawUtterance,scores:need.scores,fns:[...fns],constraints:{...need.constraints},candidates:[],exclusions:[],decision:"",inv:""};
   if(fns.length===0&&need.clarifyCount<clarifyBudget()){reason.decision="ask_clarifying (need unclear)";C.lastReason=reason;C.state="CLARIFY";return {kind:"say",text:L().qIdentify};}
-  const pair=ambiguousPair(fns,need.scores);
+  // When the shopper named a specific item, skip the pair / sweetness questions — doRank will surface that exact item.
+  const pair=named?null:ambiguousPair(fns,need.scores);
   if(pair&&need.clarifyCount<clarifyBudget()){reason.decision="ask_clarifying ("+pair.join(" vs ")+")";C.lastReason=reason;C.state="CLARIFY";return {kind:"say",text:L().pair(pair)};}
-  if(needsSweetnessQ(need)&&need.clarifyCount<clarifyBudget()){reason.decision="ask_clarifying (sweetness unknown)";C.lastReason=reason;C.state="CLARIFY";return {kind:"say",text:L().qSweet};}
+  if(!named&&needsSweetnessQ(need)&&need.clarifyCount<clarifyBudget()){reason.decision="ask_clarifying (sweetness unknown)";C.lastReason=reason;C.state="CLARIFY";return {kind:"say",text:L().qSweet};}
   return doRank(reason);
 }
 function doRank(reason){
@@ -597,8 +618,13 @@ function doRank(reason){
     reason.decision="no_match";C.lastReason=reason;C.state="ELICIT_NEED";
     return {kind:"say",text:L().noMatch};
   }
+  // If the shopper named a specific flavour/product (e.g. "mango", "芒果汁", "石榴电解质水"), honour it: pull that
+  // exact item to the front of the ranked set. This is what makes named requests right in BOTH languages —
+  // Chinese flavour words don't overlap the English keywords the scorer uses, so without this "要芒果汁" → orange.
+  const named=referencedProduct(need.rawUtterance,need.candidates);
+  if(named&&need.candidates[0]!==named){need.candidates=[named,...need.candidates.filter(p=>p!==named)];reason.decision="named→"+named.id+"; ";}
   const rec=need.candidates[0];need.currentRec=rec;C.lastRec=rec;C.lastOptions=need.candidates.slice(0,3);
-  reason.inv=`${rec.name} · qty ${rec.qty} — ${rec.qty>=3?"OK":"LOW"}`;reason.decision=`recommend ${rec.id}`;
+  reason.inv=`${rec.name} · qty ${rec.qty} — ${rec.qty>=3?"OK":"LOW"}`;reason.decision=(reason.decision||"")+`recommend ${rec.id}`;
   C.lastReason=reason;C.state="RECOMMEND";
   return {kind:"recommend",rec};
 }
@@ -620,17 +646,34 @@ function checkout(){
 const GREET=["hi","hello","hey","yo","hiya","howdy","sup","hey there","good morning","good afternoon","good evening","morning","evening","你好","您好","嗨","哈喽","哈啰","早上好","晚上好","在吗"];
 const THANKS=["thanks","thank you","thankyou","thx","cheers","ta","appreciate it","much appreciated","谢谢","多谢","感谢","谢啦","辛苦了"];
 const HELP=["help","what do you have","what do you sell","whats available","what is available","menu","what can i get","what are my options","whats good","what is good","what should i get","what you got","有什么","有啥","卖什么","菜单","有什么好","都有什么"];
-const SURPRISE=["surprise me","you pick","you choose","you decide","whatever","dunno","i dont know","not sure","recommend something","suggest something","recommend me something","what do you recommend","recommend","suggest","pick for me","up to you","anything is fine","anything works","anything you like","anything at all","just anything","随便","随便推荐","你决定","你选","都行","随你","帮我选","推荐一个","看着来","随便来"];   // bare "anything" removed — it mis-fired on "anything with caffeine" etc.
+const SURPRISE=["surprise me","you pick","you choose","you decide","whatever","dunno","i dont know","not sure","recommend something","suggest something","recommend me something","what do you recommend","recommend","suggest","pick for me","up to you","anything is fine","anything works","anything you like","anything at all","just anything","something nice","something good","cheer me up","im bored","treat me to something","most popular","whats popular","best seller","bestseller","your favourite","your favorite","idk","随便","随便推荐","你决定","你选","都行","随你","帮我选","推荐一个","看着来","随便来","不知道","不知道要什么","不确定","来点好的","随便来点","最受欢迎","最热门","卖得最好"];   // bare "anything" removed — it mis-fired on "anything with caffeine" etc.
+// Logistics questions the machine can't answer with a catalog lookup. Better an honest fixed reply than an
+// escalation to a small model that will happily invent a price or a delivery option.
+const PRICE=["price","the price","whats the price","how much is it","how much is that","how much are","how much does","how much for","how much would","cost","costs","how expensive","cheapest","the cheapest","多少钱","价格","价钱","什么价","多少钱一","贵吗","贵不贵","便宜","最便宜","哪个便宜"];
+const PAY=["pay","payment","apple pay","google pay","credit card","debit card","cash","how do i pay","take card","take cards","付款","怎么付","支付","刷卡","现金","微信支付","支付宝","怎么付款"];
+const LOCATION=["where is","which aisle","what aisle","aisle","how do i get to","can you deliver","do you deliver","delivery","在哪","在哪里","怎么走","哪个货架","配送","送货"];
+function infoTopic(text){
+  if(anyHas(text,PRICE))return "price";
+  if(anyHas(text,PAY))return "pay";
+  if(anyHas(text,LOCATION))return "location";
+  return null;
+}
+// Contentless one-word openers — a re-prompt is cheaper and friendlier than escalating to the model.
+const FILLER=new Set(["yes","yeah","yep","yup","no","nope","nah","maybe","hmm","hm","ok","okay","k","sure","um","uh","huh","eh","meh","嗯","啊","额","呃","哦"]);
 function hasNeedSignal(text){
-  return Object.keys(scoreFunctions(text)).length>0||anyHas(text,NOT_SWEET)||anyHas(text,YES_SWEET)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,NO_CAF)||anyHas(text,GENERIC_DRINK)||!!referencedProduct(text,CATALOG);
+  return Object.keys(scoreFunctions(text)).length>0||anyHas(text,NOT_SWEET)||anyHas(text,YES_SWEET)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,NO_CAF)||anyHas(text,GENERIC_DRINK)||anyHas(text,HEALTH_LEAN)||!!referencedProduct(text,CATALOG);
 }
 function forceNeed(fns,text){
   C.need=newNeed();C.need.rawUtterance=text;C.need.functions=fns;
   return doRank({need:text,scores:{},fns:[...fns],constraints:{...C.need.constraints},candidates:[],exclusions:[],decision:"open pick",inv:""});
 }
 function metaIntent(text){
+  const info=infoTopic(text);
+  if(info==="price"||info==="pay")return {kind:"say",text:L().info(info)};   // answer money questions honestly, even over a product mention
+  if(anyHas(text,HOT_WANT))return {kind:"say",text:L().noHot};               // we stock nothing hot/room-temp — say so instead of handing over a chilled water
   if(anyHas(text,SURPRISE)&&!hasNeedSignal(text)) return forceNeed(["hydration","rehydration_electrolytes","fruit_refreshment","treat_dessert"],text);
   if(hasNeedSignal(text)) return null;
+  if(info==="location")return {kind:"say",text:L().info("location")};        // only when they didn't also name a product
   if(anyHas(text,THANKS)) return {kind:"say",text:L().thanks()};
   if(anyHas(text,HELP)) return {kind:"say",text:L().help};
   if(GREET.some(g=>text===g||text.startsWith(g+" ")||text.startsWith(g+",")||text.startsWith(g))) return {kind:"say",text:L().greetReply()};
@@ -658,7 +701,13 @@ function handle(raw){
     if(C.state==="END")C.cart=[];
     const meta=metaIntent(text);
     if(meta)return meta;
-    if(!hasNeedSignal(text))return {kind:"escalate",raw};   // rules recognise nothing → hand this turn to the LLM
+    if(!hasNeedSignal(text)){
+      // A bare quantity ("give me three", "a couple") names no product — ask what, don't guess in the LLM.
+      if(parseQty(text)!=null)return {kind:"say",text:L().qIdentify};
+      // A bare filler opener ("yes", "no", "hmm", "ok") carries no need — a quick re-prompt beats spinning up the LLM.
+      if(text&&text.split(" ").every(w=>FILLER.has(w)))return {kind:"say",text:L().qIdentify};
+      return {kind:"escalate",raw};   // rules recognise nothing → hand this turn to the LLM
+    }
     return startNeed(text);
   }
   if(C.state==="CLARIFY"){C.need.clarifyCount++;C.need.rawUtterance=(C.need.rawUtterance+" "+text).trim();return infer();}
