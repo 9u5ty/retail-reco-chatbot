@@ -196,6 +196,84 @@ E.reset(); ok("  \"what's most popular\" -> recommend", turn("what's most popula
 E.reset(); ok("  bare filler \"hmm\" -> gentle re-prompt (say, not escalate)", turn("hmm").kind === "say");
 E.reset(); ok("  quantity-only \"give me three\" -> ask what (say, not escalate)", turn("give me three").kind === "say");
 
+section("FIX · a NEW category voiced mid-recommendation switches needs (was: answered about the old pick)");
+E.reset();
+turn("i want juice");                                        // RECOMMEND, a juice on screen
+r = turn("actually a gift instead");
+ok("  \"actually a gift instead\" -> switch to a gift", r.kind === "recommend" && /Blind Box|Collectible/i.test(rec(r)), rec(r));
+r = turn("the pink one");
+ok("  then \"the pink one\" -> pink gift", /pink/i.test(rec(r)), rec(r));
+r = turn("yes");
+ok("  \"yes\" -> adds the pink gift", r.kind === "added" && /pink/i.test(r.product.name), r.product && r.product.name);
+// a within-category tweak must NOT be misread as a category switch
+E.reset();
+turn("something fruity"); r = turn("the mango one");
+ok("  \"the mango one\" (same category) -> still a juice reselect", r.kind === "recommend" && /Mango/i.test(rec(r)), rec(r));
+// a product question must still answer, not switch
+E.reset();
+turn("i want juice"); r = turn("is it cold?");
+ok("  \"is it cold?\" -> answers, keeps the juice (no switch)", r.kind === "say" && /chilled|frozen|room/i.test(r.text), r.text);
+
+section("FIX · \"not sweet\" is never relaxed into sweet ice cream (explicit no-sugar honoured)");
+["something not sweet, no caffeine, and cold", "a cold drink that isn't sweet", "not sweet and cold please"].forEach(m => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> a low-sweetness pick, not Ice Cream", r.kind === "recommend" && r.rec.sweetness <= 2 && !/Ice Cream/i.test(rec(r)), { rec: rec(r), sw: r.rec && r.rec.sweetness });
+});
+
+section("FIX · \"surprise me\" recommends a drink/treat, not always a gift; an explicit gift still routes to gifts");
+["surprise me", "you pick", "recommend something", "anything is fine"].forEach(m => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> recommend a non-gift", r.kind === "recommend" && !/Blind Box|Collectible/i.test(rec(r)), rec(r));
+});
+["a surprise gift for a friend", "surprise me with a gift"].forEach(m => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> an explicit gift still routes to a gift", r.kind === "recommend" && /Blind Box|Collectible/i.test(rec(r)), rec(r));
+});
+
+section("FIX · a named request stays exact (variety never overrides a specific ask)");
+["要芒果汁", "the mango one", "a pomegranate electrolyte", "evian"].forEach(m => {
+  const seen = new Set();
+  for (let i = 0; i < 5; i++) { E.reset(); seen.add(rec(turn(m))); }   // pick() is deterministic-first in test; assert stability
+  ok("  \"" + m + "\" -> same exact item every time", seen.size === 1, [...seen]);
+});
+
+section("FIX · typo tolerance: transpositions and doubled letters resolve (not escalate)");
+[["im thirtsy", /Water/i], ["waterr please", /Water/i], ["gimme a giftt", /Blind Box|Collectible/i], ["a colllectible", /Blind Box|Collectible/i]].forEach(([m, re]) => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> recognised (not escalate)", r.kind === "recommend" && re.test(rec(r)), { kind: r.kind, rec: rec(r) });
+});
+// the fuzzy matcher must NOT create collisions: "gold" is not "cold", "sweating" is not "sweet"
+E.reset(); ok("  \"gold coin\" is NOT read as cold/a product", turn("gold coin").kind === "escalate");
+E.reset(); r = turn("i am sweating"); ok("  \"sweating\" -> electrolyte recovery, not a sweet treat", r.kind === "recommend" && /Electrolyte/i.test(rec(r)), rec(r));
+
+section("FEATURE · compound \"X and Y\" builds the whole basket (auto-advance on each add)");
+E.reset();
+r = turn("a water and an ice cream");
+ok("  compound -> recommends the first item (water)", r.kind === "recommend" && /Water/i.test(rec(r)), rec(r));
+r = turn("yes");
+ok("  accept 1st -> added, and the NEXT item (ice cream) is chained", r.kind === "added" && r.next && r.next.kind === "recommend" && /Ice Cream/i.test(r.next.rec.name), r.next && r.next.rec && r.next.rec.name);
+r = turn("yes");
+ok("  accept 2nd -> both items now in the cart", cartHas(/Water/i) && cartHas(/Ice Cream/i), cart().map(i => i.name));
+ok("  queue drained", E.C().queue.length === 0, E.C().queue);
+// quantity is preserved per segment
+E.reset();
+turn("two waters and a juice"); r = turn("yes");
+ok("  \"two waters\" segment keeps qty 2", r.kind === "added" && r.qty === 2, r.qty);
+turn("yes");
+ok("  ...and the juice is added after", cartHas(/Juice/i) && cart().find(i => /Water/i.test(i.name)).qty === 2, cart().map(i => i.name + "x" + i.qty));
+// three items chain through
+E.reset();
+turn("a water, a juice, and an ice cream"); turn("yes"); turn("yes"); turn("yes");
+ok("  \"A, B, and C\" -> all three added", cartHas(/Water/i) && cartHas(/Juice/i) && cartHas(/Ice Cream/i), cart().map(i => i.name));
+// a shared modifier is NOT a compound
+E.reset();
+r = turn("something not sweet and cold");
+ok("  \"not sweet and cold\" -> ONE low-sweet drink, no queue", r.kind === "recommend" && r.rec.sweetness <= 2 && E.C().queue.length === 0, { rec: rec(r), q: E.C().queue.length });
+// a negated clause is not an item to add
+E.reset();
+r = turn("no juice, just water");
+ok("  \"no juice, just water\" stays one need -> water (comma ≠ list)", r.kind === "recommend" && !/Juice/i.test(rec(r)) && E.C().queue.length === 0, rec(r));
+
 /* ============================ FIXES ============================ */
 section("FIX · checkout is honoured from ANY state (was a bug in RECOMMEND)");
 E.reset();

@@ -244,6 +244,7 @@ const LX={
     noMatch:"Sorry — I couldn't find something in stock that fits. Want to try a different kind of drink or treat?",
     cartEmptyElicit:"Your cart's empty — what would you like?",
     added:(name,qty,capped)=>`${pick(["Done —","Nice —","Got it —"])} <b>${esc(name)}</b> ×${qty} in the cart.${capped?" (that's all we have in stock)":""} ${pick(["Anything else, or shall I check you out?","Want anything else, or ready to check out?","Add anything else?"])}`,
+    addedMore:(name,qty,capped)=>`${pick(["Done —","Nice —","Got it —"])} <b>${esc(name)}</b> ×${qty} in the cart.${capped?" (that's all we have in stock)":""} ${pick(["Now, next up —","And for the next one —","On to the next —"])}`,
     removed:name=>`${pick(["Removed","Took out"])} <b>${esc(name)}</b>. Anything else?`,
     options:list=>`Here are a few options:<ol>${list.map(p=>`<li><b>${esc(pname(p))}</b> — ${cap(p.sugar_level)} sugar, ${cap(p.served)}</li>`).join("")}</ol>Which one — you can say "the first" or name it.`,
     planRow:(dir,qty,ett,name)=>`<div>Turn <b>${dir}</b> → pick <b>×${qty}</b>${ett?` <span style="color:var(--accent)">(${ett} BT)</span>`:""} · ${esc(name)}</div>`,
@@ -284,6 +285,7 @@ const LX={
     noMatch:"抱歉，暂时没有完全合适的现货。要不要换一类饮料或甜点试试？",
     cartEmptyElicit:"购物车是空的 —— 想来点什么呢？",
     added:(name,qty,capped)=>`${pick(["好啦——","没问题——","收到——"])}<b>${esc(name)}</b> ×${qty} 已加入购物车。${capped?"（库存只有这么多了）":""}${pick(["还要别的吗，还是现在结账？","要不要再加点，或者结账？","还需要点什么吗？"])}`,
+    addedMore:(name,qty,capped)=>`${pick(["好啦——","没问题——","收到——"])}<b>${esc(name)}</b> ×${qty} 已加入购物车。${capped?"（库存只有这么多了）":""}${pick(["接下来——","再看下一个——","下一样——"])}`,
     removed:name=>`已${pick(["移除","去掉"])} <b>${esc(name)}</b>。还要别的吗？`,
     options:list=>`给你几个选择：<ol>${list.map(p=>`<li><b>${esc(pname(p))}</b> —— ${ZH_SUG[p.sugar_level]}、${ZH_SERV[p.served]}</li>`).join("")}</ol>要哪一个？可以说"第一个"或直接说名字。`,
     planRow:(dir,qty,ett,name)=>`<div>向<b>${dir}</b>转 → 抓取 <b>×${qty}</b>${ett?` <span style="color:var(--accent)">（${ett} 行为树）</span>`:""} · ${esc(name)}</div>`,
@@ -366,10 +368,14 @@ function blankConstraints(){return {max_sweetness:null,notSweet:false,wantSweet:
 /* --- fuzzy language understanding: stemming + typo tolerance --- */
 const STOP=new Set("a an the i im to for of and or my me you it is are am was want wanna need get gimme got have some something anything like feel feeling really just please would can could id we so am also bit really pretty kinda kind".split(" "));
 function stem(w){let s=w;if(s.length>4)s=s.replace(/(ing|ed)$/,"");if(s.length>3)s=s.replace(/s$/,"");return s;}
-function lev(a,b){const m=a.length,n=b.length;if(Math.abs(m-n)>1)return 2;const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);for(let j=0;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+// Damerau-Levenshtein: like Levenshtein but an adjacent transposition ("thirtsy"↔"thirsty") costs 1, not 2 —
+// transpositions are a common typo class with far fewer false collisions than substitutions.
+function lev(a,b){const m=a.length,n=b.length;if(Math.abs(m-n)>1)return 2;const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);for(let j=0;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])d[i][j]=Math.min(d[i][j],d[i-2][j-2]+1);}return d[m][n];}
 function wtoks(text){return text.split(" ").filter(w=>w&&!STOP.has(w));}
-// fuzzy typo tolerance only for longer words (avoids sweet≈sweat, cold≈gold collisions)
-function tokMatch(tok,cue){return tok===cue||stem(tok)===stem(cue)||(cue.length>=6&&tok.length>=5&&lev(tok,cue)<=1);}
+const dedupe=w=>w.replace(/(.)\1+/g,"$1");   // collapse repeated letters: "waterr"→"water", "giftt"→"gift"
+// fuzzy typo tolerance for longer words (len≥6 keeps sweet≈sweat, cold≈gold from colliding); plus a doubled-letter
+// pass so short but common typos ("giftt", "waterr", "juuce") still resolve without loosening substitution distance.
+function tokMatch(tok,cue){return tok===cue||stem(tok)===stem(cue)||(cue.length>=6&&tok.length>=5&&lev(tok,cue)<=1)||(cue.length>=4&&tok!==dedupe(tok)&&dedupe(tok)===dedupe(cue));}
 function cueHit(text,toks,cue){return (CJK.test(cue)||cue.includes(" ")||cue.includes("-"))?has(text,cue):toks.some(t=>tokMatch(t,cue));}
 
 let _sfKey=null,_sfVal=null;   // 1-entry memo: scoreFunctions depends only on text, and is called several times per turn on the same text
@@ -485,6 +491,8 @@ function parseQty(text){
   if(/\bmake it (\d+|two|three|four|five)\b/.test(text)){const w=text.match(/\bmake it (\d+|two|three|four|five)\b/)[1];return NUMWORDS[w]||parseInt(w);}
   const zm=text.match(/([0-9一二两三四五六七八九十]+)\s*(?:个|瓶|杯|份|支|盒)/);   // 两个 / 来三瓶 / 要5个
   if(zm){const w=zm[1];return ZHNUM[w]||parseInt(w)||null;}
+  const lead=text.match(/^\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+[a-z]/);   // "two waters", "3 juices"
+  if(lead){const w=lead[1];return NUMWORDS[w]||parseInt(w)||null;}
   return null;
 }
 function parseOrdinal(text){
@@ -551,10 +559,10 @@ function isProductQuestion(raw,text){
 
 /* ===================== CONVERSATION STATE MACHINE ===================== */
 let C;
-function newConvo(){return {state:"GREETING",profile:blankConstraints(),cart:[],history:[],lastRec:null,lastOptions:[],need:null,lastReason:null};}
+function newConvo(){return {state:"GREETING",profile:blankConstraints(),cart:[],history:[],lastRec:null,lastOptions:[],need:null,lastReason:null,queue:[]};}
 function memoryOn(){const e=document.getElementById("knob-memory");return !e||e.value==="on";}
 function clarifyBudget(){const e=document.getElementById("knob-clarify");return e&&e.value==="0.7"?3:2;}
-function newNeed(){return {rawUtterance:"",scores:{},functions:[],constraints:memoryOn()?cloneC(C.profile):blankConstraints(),candidates:[],scored:[],currentRec:null,offeredSkus:[],clarifyCount:0};}
+function newNeed(){return {rawUtterance:"",scores:{},functions:[],constraints:memoryOn()?cloneC(C.profile):blankConstraints(),candidates:[],scored:[],currentRec:null,offeredSkus:[],clarifyCount:0,pendingQty:null};}
 function persistPrefs(text){
   if(!memoryOn())return;const c=C.profile;
   if(anyHas(text,NOT_SWEET)){c.notSweet=true;c.wantSweet=false;c.max_sweetness=2;c.prefer_sugar=["none","low"];}
@@ -587,6 +595,11 @@ function infer(){
   // item's own tags so doRank recommends it directly instead of asking a needless clarifying question.
   let named=null;
   if(need.functions.length===0){named=referencedProduct(need.rawUtterance,CATALOG);if(named)need.functions=[...named.function_tags];}
+  // "not sweet" + only a WEAK dessert signal (usually the ambiguous word "cold") is really a cold NON-sweet drink,
+  // not sweet ice cream — steer to water rather than letting the relax loop bust the explicit no-sugar request.
+  if(anyHas(need.rawUtterance,NOT_SWEET)&&need.functions.length>0&&need.functions.every(f=>f==="treat_dessert")&&(need.scores.treat_dessert||0)<THRESHOLD){
+    need.functions=["hydration"];
+  }
   extractInto(need.constraints,need.rawUtterance);
   persistPrefs(need.rawUtterance);
   const fns=need.functions;
@@ -618,12 +631,17 @@ function doRank(reason){
     reason.decision="no_match";C.lastReason=reason;C.state="ELICIT_NEED";
     return {kind:"say",text:L().noMatch};
   }
-  // If the shopper named a specific flavour/product (e.g. "mango", "芒果汁", "石榴电解质水"), honour it: pull that
-  // exact item to the front of the ranked set. This is what makes named requests right in BOTH languages —
-  // Chinese flavour words don't overlap the English keywords the scorer uses, so without this "要芒果汁" → orange.
+  // If the shopper named a specific flavour/product (e.g. "mango", "芒果汁", "石榴电解质水"), honour it exactly.
+  // Otherwise pick among the items TIED at the top score — pick() is random in the app (a fresh face each visit,
+  // so "a gift" / "surprise me" don't always return the identical item) and deterministic-first under test.
+  // Chinese flavour words don't overlap the English keywords the scorer uses, so the named path is what makes
+  // "要芒果汁" resolve to mango instead of orange.
   const named=referencedProduct(need.rawUtterance,need.candidates);
-  if(named&&need.candidates[0]!==named){need.candidates=[named,...need.candidates.filter(p=>p!==named)];reason.decision="named→"+named.id+"; ";}
-  const rec=need.candidates[0];need.currentRec=rec;C.lastRec=rec;C.lastOptions=need.candidates.slice(0,3);
+  let rec;
+  if(named){rec=named;reason.decision="named→"+named.id+"; ";}
+  else{const top=need.scored[0].total;const tied=need.scored.filter(s=>s.total===top).map(s=>s.p);rec=pick(tied);if(tied.length>1)reason.decision="pick 1 of "+tied.length+" tied; ";}
+  if(need.candidates[0]!==rec){need.candidates=[rec,...need.candidates.filter(p=>p!==rec)];}
+  need.currentRec=rec;C.lastRec=rec;C.lastOptions=need.candidates.slice(0,3);
   reason.inv=`${rec.name} · qty ${rec.qty} — ${rec.qty>=3?"OK":"LOW"}`;reason.decision=(reason.decision||"")+`recommend ${rec.id}`;
   C.lastReason=reason;C.state="RECOMMEND";
   return {kind:"recommend",rec};
@@ -632,13 +650,38 @@ function offerLine(p){
   return L().offer(p,C.need.functions[0],C.need.constraints.notSweet,C.cart.length>0);
 }
 function accept(qty){
-  const p=C.need.currentRec;const want=qty||1;const q=Math.min(want,p.qty);
+  const p=C.need.currentRec;const want=qty||C.need.pendingQty||1;const q=Math.min(want,p.qty);
   cartAdd(p,q);C.state="POST_ADD";
-  return {kind:"added",product:p,qty:q,capped:want>p.qty};
+  const added={kind:"added",product:p,qty:q,capped:want>p.qty};
+  // Compound request ("a water and an ice cream"): after adding one item, advance to the next queued item so the
+  // whole basket gets built in one flow instead of dropping everything but the last thing they said.
+  if(C.queue&&C.queue.length){const next=C.queue.shift();added.next=startNeed(next);}
+  return added;
 }
-function startNeed(text){C.need=newNeed();C.need.rawUtterance=text;return infer();}
+function startNeed(text){C.need=newNeed();C.need.rawUtterance=text;C.need.pendingQty=parseQty(text);return infer();}
+// "a water and an ice cream", "两瓶水和一个冰淇淋" → ["a water","an ice cream"]; null if it isn't really two+ distinct
+// items. Splits the RAW text (commas survive here — normalize() would strip them) then normalises each piece.
+function splitCompound(raw){
+  const segs=raw.split(/\s*(?:,|;|、|，|\band\b|\bplus\b|\bthen\b|&|以及|还有|外加|和|跟)\s*/i).map(x=>normalize(x)).filter(Boolean);
+  if(segs.length<2)return null;
+  const items=segs.filter(hasItemNeed);   // each piece must name an actual item, not just a shared modifier ("cold")
+  return items.length>=2?items:null;
+}
+// Does this fragment name a concrete item to ADD (a function, product, drink or health lean) rather than a bare
+// constraint ("cold") or an exclusion ("no juice")? Used so "not sweet and cold" and "no juice, just water" each
+// stay ONE need instead of being mis-split into two.
+function hasItemNeed(seg){
+  if(/\b(no|not|without|dont|hold|skip|hate|avoid)\b/.test(seg)||/不要|不用|不想|别的?|没有|不喜欢/.test(seg))return false;
+  return Object.keys(scoreFunctions(seg)).length>0||!!referencedProduct(seg,CATALOG)||anyHas(seg,GENERIC_DRINK)||anyHas(seg,HEALTH_LEAN);
+}
+// Start a fresh need, honouring a compound "X and Y" by queueing the extra items for auto-advance on each add.
+function beginNeed(raw){
+  const parts=splitCompound(raw);
+  if(parts){C.queue=parts.slice(1);return startNeed(parts[0]);}
+  C.queue=[];return startNeed(normalize(raw));
+}
 function checkout(){
-  const items=C.cart.map(i=>({...i}));C.state="ELICIT_NEED";C.cart=[];
+  const items=C.cart.map(i=>({...i}));C.state="ELICIT_NEED";C.cart=[];C.queue=[];
   return {kind:"checkout",items};
 }
 
@@ -671,7 +714,15 @@ function metaIntent(text){
   const info=infoTopic(text);
   if(info==="price"||info==="pay")return {kind:"say",text:L().info(info)};   // answer money questions honestly, even over a product mention
   if(anyHas(text,HOT_WANT))return {kind:"say",text:L().noHot};               // we stock nothing hot/room-temp — say so instead of handing over a chilled water
-  if(anyHas(text,SURPRISE)&&!hasNeedSignal(text)) return forceNeed(["hydration","rehydration_electrolytes","fruit_refreshment","treat_dessert"],text);
+  // "surprise me" / "you pick" = open choice. "surprise" also scores as a gift cue (a blind box IS a surprise),
+  // so only treat it as a real gift when the shopper adds an explicit gift word; otherwise recommend across
+  // drinks & treats instead of defaulting to the same mystery box every time.
+  if(anyHas(text,SURPRISE)){
+    const sc=scoreFunctions(text);
+    const otherNeed=Object.keys(sc).some(f=>f!=="gift_novelty"&&sc[f]>=THRESHOLD)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,NOT_SWEET)||anyHas(text,YES_SWEET)||anyHas(text,GENERIC_DRINK)||anyHas(text,HEALTH_LEAN)||!!referencedProduct(text,CATALOG);
+    const explicitGift=anyHas(text,["gift","present","collectible","blind box","blindbox","mystery box","souvenir","for a friend","for my","birthday","礼物","礼品","盲盒","收藏","手办","送人","送朋友","送礼","送给"]);
+    if(!otherNeed&&!explicitGift)return forceNeed(["hydration","rehydration_electrolytes","fruit_refreshment","treat_dessert"],text);
+  }
   if(hasNeedSignal(text)) return null;
   if(info==="location")return {kind:"say",text:L().info("location")};        // only when they didn't also name a product
   if(anyHas(text,THANKS)) return {kind:"say",text:L().thanks()};
@@ -708,7 +759,7 @@ function handle(raw){
       if(text&&text.split(" ").every(w=>FILLER.has(w)))return {kind:"say",text:L().qIdentify};
       return {kind:"escalate",raw};   // rules recognise nothing → hand this turn to the LLM
     }
-    return startNeed(text);
+    return beginNeed(raw);
   }
   if(C.state==="CLARIFY"){C.need.clarifyCount++;C.need.rawUtterance=(C.need.rawUtterance+" "+text).trim();return infer();}
 
@@ -726,6 +777,17 @@ function handle(raw){
       if(pick){need.currentRec=pick;C.lastRec=pick;
         if(anyHas(text,ACCEPT)||/\b(take|have|get|want|add|instead)\b/.test(text))return accept(parseQty(text));
         return {kind:"recommend",rec:pick,reselect:true};}
+    }
+    // A NEW category voiced mid-recommendation ("actually a gift instead", "let's do a juice", "rather have water")
+    // → start that need fresh instead of answering about the current pick. Fires only for a genuinely different
+    // category (a strong new function, or a named product from another category), so within-category tweaks,
+    // accepts, quantities and product questions are all left to the branches below.
+    if(!anyHas(text,ACCEPT)&&parseQty(text)==null){
+      const ns=scoreFunctions(text);
+      const strongNew=Object.keys(ns).some(f=>ns[f]>=THRESHOLD&&!need.functions.includes(f));
+      const xref=referencedProduct(text,CATALOG);
+      const xcat=xref&&!need.candidates.includes(xref)&&!xref.function_tags.some(f=>need.functions.includes(f));
+      if(strongNew||xcat)return beginNeed(raw);
     }
     // named reference ("the pink one", "the mango")
     const SWITCH=["different","换","换个","换一个","再换"];   // "switch to X" reads as a reference, not a plain no
@@ -756,7 +818,11 @@ function handle(raw){
     }
     // decline with a new constraint
     if(anyHas(text,NOT_SWEET)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,WARM)||anyHas(text,NO_CAF)){
-      need.offeredSkus.push(need.currentRec.id);extractInto(need.constraints,text);persistPrefs(text);
+      extractInto(need.constraints,text);persistPrefs(text);
+      // if the current pick already meets the new constraint (e.g. "make it cold" on an already-chilled water),
+      // keep it rather than switching to a different product for no reason.
+      if(passes(need.currentRec,need.constraints))return {kind:"recommend",rec:need.currentRec,reselect:true};
+      need.offeredSkus.push(need.currentRec.id);
       return doRank(freshReason());
     }
     // plain decline
@@ -794,7 +860,7 @@ function handle(raw){
     if(meta)return meta;                                           // help/greet reply, or "you pick" → recommend
     if(!hasNeedSignal(text))return {kind:"escalate",raw};          // unrecognised mid-shopping → hand to LLM
     // otherwise a new need
-    return startNeed(text);
+    return beginNeed(raw);
   }
   return {kind:"escalate",raw};   // truly nothing matched → let the LLM try
 }
@@ -875,7 +941,7 @@ function recCard(p){const isNovel=p.category==="Blind Box"||p.category==="Collec
 function render(r){
   if(r.kind==="recommend"){const o=offerLine(r.rec);
     botSay(`${esc(o.pre)}${recCard(r.rec)}<div style="margin-top:7px">${esc(o.ask)}</div>`);}
-  else if(r.kind==="added") botSay(L().added(pname(r.product),r.qty,r.capped));
+  else if(r.kind==="added"){botSay((r.next?L().addedMore:L().added)(pname(r.product),r.qty,r.capped));if(r.next)render(r.next);}   // compound: chain the next queued item
   else if(r.kind==="removed") botSay(L().removed(pname(r.product)));
   else if(r.kind==="options") botSay(L().options(r.options));
   else if(r.kind==="checkout"){
