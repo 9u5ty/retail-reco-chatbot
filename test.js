@@ -274,6 +274,52 @@ E.reset();
 r = turn("no juice, just water");
 ok("  \"no juice, just water\" stays one need -> water (comma ≠ list)", r.kind === "recommend" && !/Juice/i.test(rec(r)) && E.C().queue.length === 0, rec(r));
 
+section("FIX · negation on a named product is honoured (was: \"no X\" still recommended X)");
+E.reset();
+r = turn("a water, no ice cream");
+ok("  \"a water, no ice cream\" -> water, not ice cream", r.kind === "recommend" && !/Ice Cream/i.test(rec(r)), rec(r));
+E.reset();
+r = turn("recommend something but not a gift");
+ok("  \"...not a gift\" -> a non-gift recommendation (not escalate)", r.kind === "recommend" && !/Blind Box|Collectible/i.test(rec(r)), { kind: r.kind, rec: rec(r) });
+E.reset();
+turn("something fruity"); r = turn("not the mango one");
+ok("  \"not the mango one\" -> does NOT switch to mango", !(r.kind === "recommend" && /Mango/i.test(rec(r))), rec(r));
+E.reset();
+r = turn("something after my workout but no electrolytes");
+ok("  \"...no electrolytes\" -> not an electrolyte water", !(r.kind === "recommend" && /Electrolyte/i.test(rec(r))), { kind: r.kind, rec: rec(r) });
+E.setLang("zh");
+E.reset();
+r = turn("不要芒果，要别的果汁");
+ok("  中文 \"不要芒果，要别的果汁\" -> a juice that is NOT mango", r.kind === "recommend" && !/Mango/i.test(rec(r)) && /Juice/i.test(rec(r)), rec(r));
+E.setLang("en");
+
+section("FEATURE · cart editing: change quantity, and clear the whole cart");
+E.reset();
+turn("i want water"); turn("yes"); r = turn("actually make it three");
+ok("  \"make it three\" -> SET qty to 3 (not +3)", r.kind === "added" && r.qty === 3 && cart()[0].qty === 3, { qty: r.qty, cart: cart().map(i => i.qty) });
+E.reset();
+turn("i want a gift"); turn("yes"); r = turn("change to 2");
+ok("  \"change to 2\" -> qty 2", r.kind === "added" && cart()[0].qty === 2, cart().map(i => i.qty));
+E.reset();
+turn("i want a gift"); turn("yes"); r = turn("remove everything");
+ok("  \"remove everything\" -> cart cleared", r.kind === "cleared" && cart().length === 0, { kind: r.kind, n: cart().length });
+E.reset();
+turn("something fruity"); turn("i want water"); turn("yes"); r = turn("clear the cart");
+ok("  \"clear the cart\" works mid-recommendation too", r.kind === "cleared" && cart().length === 0, { kind: r.kind, n: cart().length });
+// "N more" must still ADD (not be swallowed by the set-quantity path)
+E.reset();
+turn("i want water"); turn("yes"); r = turn("two more");
+ok("  \"two more\" still ADDS (qty 3 total), not set-to-2", cart()[0].qty === 3, cart()[0] && cart()[0].qty);
+
+section("FIX · \"a juice without sugar\": no sugar-free juice exists → honour no-sugar with water, not a sugary juice");
+E.reset();
+r = turn("a juice without sugar");
+ok("  -> a zero/low-sugar pick, not a high-sugar juice", r.kind === "recommend" && r.rec.sugar_level !== "high", { rec: rec(r), sugar: r.rec && r.rec.sugar_level });
+// but an explicitly-named sweet item is still honoured even under a standing not-sweet preference
+E.reset();
+turn("i don't like sweet drinks"); r = turn("actually some ice cream");
+ok("  explicit \"ice cream\" beats a standing not-sweet preference", r.kind === "recommend" && /Ice Cream/i.test(rec(r)), rec(r));
+
 /* ============================ FIXES ============================ */
 section("FIX · checkout is honoured from ANY state (was a bug in RECOMMEND)");
 E.reset();

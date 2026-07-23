@@ -243,6 +243,7 @@ const LX={
     pair:pair=>{const s=new Set(pair);return s.has("gift_novelty")?"Is this for yourself, or a gift / something fun to give?":s.has("treat_dessert")?"Something to drink and quench your thirst, or more of a dessert-style treat?":s.has("fruit_refreshment")?"Would you like a plain, replenishing water, or something fruity and flavoured?":"What matters most — hydration, flavour, or a treat?";},
     noMatch:"Sorry — I couldn't find something in stock that fits. Want to try a different kind of drink or treat?",
     cartEmptyElicit:"Your cart's empty — what would you like?",
+    cartCleared:"Done — I've emptied your cart. What would you like to start with?",
     added:(name,qty,capped)=>`${pick(["Done —","Nice —","Got it —"])} <b>${esc(name)}</b> ×${qty} in the cart.${capped?" (that's all we have in stock)":""} ${pick(["Anything else, or shall I check you out?","Want anything else, or ready to check out?","Add anything else?"])}`,
     addedMore:(name,qty,capped)=>`${pick(["Done —","Nice —","Got it —"])} <b>${esc(name)}</b> ×${qty} in the cart.${capped?" (that's all we have in stock)":""} ${pick(["Now, next up —","And for the next one —","On to the next —"])}`,
     removed:name=>`${pick(["Removed","Took out"])} <b>${esc(name)}</b>. Anything else?`,
@@ -284,6 +285,7 @@ const LX={
     pair:pair=>{const s=new Set(pair);return s.has("gift_novelty")?"是自己用，还是想挑个礼物 / 好玩的送人？":s.has("treat_dessert")?"想喝点解渴的，还是更想来点甜品？":s.has("fruit_refreshment")?"想要清爽的白水，还是果味饮料？":"你更看重哪一点 —— 补水、口味，还是甜点？";},
     noMatch:"抱歉，暂时没有完全合适的现货。要不要换一类饮料或甜点试试？",
     cartEmptyElicit:"购物车是空的 —— 想来点什么呢？",
+    cartCleared:"好的 —— 购物车已清空。想先来点什么？",
     added:(name,qty,capped)=>`${pick(["好啦——","没问题——","收到——"])}<b>${esc(name)}</b> ×${qty} 已加入购物车。${capped?"（库存只有这么多了）":""}${pick(["还要别的吗，还是现在结账？","要不要再加点，或者结账？","还需要点什么吗？"])}`,
     addedMore:(name,qty,capped)=>`${pick(["好啦——","没问题——","收到——"])}<b>${esc(name)}</b> ×${qty} 已加入购物车。${capped?"（库存只有这么多了）":""}${pick(["接下来——","再看下一个——","下一样——"])}`,
     removed:name=>`已${pick(["移除","去掉"])} <b>${esc(name)}</b>。还要别的吗？`,
@@ -336,6 +338,7 @@ const MORE_CUES=["options","other options","what else","show me more","show me o
 const DONE_NO=["no","nope","nah","not really","no more","that's it","thats it","i'm done","im done"];   // bare "done" signals (POST_ADD)
 const BROWSE=["something else","anything else","a different one","different one","show me another","other stuff","other things","别的","其他","其他的","换点别的","还有别的","再来点别的"];   // "show me more" intent, not checkout
 const READD=["one more","another one","one of those too","one of those as well","same again","add another","one more of those","one more of that","再来一个","再来一瓶","再来一杯","多来一个","再要一个","同样再来"];   // "one more of what I just added" (POST_ADD)
+const CLEAR=["remove everything","clear the cart","clear my cart","clear cart","empty the cart","empty my cart","empty the basket","start over","cancel everything","cancel the order","remove all","remove them all","take everything out","clear it all","清空","清空购物车","全部删掉","全部去掉","都删掉","全不要了","全部取消","重新来"];   // wipe the whole cart
 const NUMWORDS={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,couple:2,pair:2,few:3};
 const ORDINALS={first:0,"1st":0,second:1,"2nd":1,third:2,"3rd":2,fourth:3,last:-1};
 const DISTINCTIVE=["black","green","purple","pink","orange","blue","white grape","white","grape","mango","guava","pomegranate","jasmine","vanilla","evian","nongfu","gareer","electrolyte","juice","water","collectible","blind box","ice cream","黑色","绿色","紫色","粉色","橙色","蓝色","白葡萄","葡萄","芒果","番石榴","石榴","茉莉","依云","农夫","冰淇淋","盲盒","矿泉水"];
@@ -390,19 +393,21 @@ function scoreFunctions(text){
   _sfKey=text;_sfVal=s;
   return {...s};
 }
-// "no juice", "not a gift", "without coffee" → drop that function
+// "no juice", "not a gift", "without coffee", "no ice cream" → drop that function
 // strict match + narrow window + stop at first hit, so "no juice, just water" only kills juice
 function applyNegation(text,scores){
-  const NEG=new Set(["no","not","without","dont","hate","avoid","skip","nothing","never","cant"]);
+  const NEG=new Set(["no","not","without","dont","hate","avoid","skip","nothing","never","cant","minus","hold"]);
   const w=text.replace(/'/g,"").split(" ");
   for(let i=0;i<w.length;i++){
     if(!NEG.has(w[i]))continue;
     for(let j=i+1;j<=i+2&&j<w.length;j++){
       if(NEG.has(w[j])||STOP.has(w[j]))continue;
       let hit=false;
+      const two=j+1<w.length?w[j]+" "+w[j+1]:null;   // "ice cream", "blind box" — negate multi-word cues too
       for(const tag of Object.keys(scores)){
-        const single=[...CUES[tag].strong,...CUES[tag].support].filter(c=>!c.includes(" ")&&!c.includes("-"));
-        if(single.some(c=>w[j]===c||stem(w[j])===stem(c))){delete scores[tag];hit=true;}
+        const cues=[...CUES[tag].strong,...CUES[tag].support].filter(c=>!c.includes("-"));
+        if(cues.some(c=>!c.includes(" ")&&(w[j]===c||stem(w[j])===stem(c)))){delete scores[tag];hit=true;}
+        else if(two&&cues.some(c=>c===two)){delete scores[tag];hit=true;}
       }
       if(hit)break;
     }
@@ -495,14 +500,33 @@ function parseQty(text){
   if(lead){const w=lead[1];return NUMWORDS[w]||parseInt(w)||null;}
   return null;
 }
+// "make it three", "change to 2", "actually 3", "N instead", 中文 "改成两个" → SET the quantity (not add more). Requires
+// an explicit number so "make it cold" / "actually a gift" don't trip it.
+function setQtyIntent(text){
+  const m=text.match(/\b(?:make it|make that|change (?:it )?to|set (?:it )?to|actually|just|only)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/);
+  if(m)return NUMWORDS[m[1]]||parseInt(m[1])||null;
+  const inst=text.match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+instead\b/);
+  if(inst)return NUMWORDS[inst[1]]||parseInt(inst[1])||null;
+  const zh=text.match(/(?:改成|改为|换成)\s*([0-9一二两三四五六七八九十]+)/);
+  if(zh)return ZHNUM[zh[1]]||parseInt(zh[1])||null;
+  return null;
+}
 function parseOrdinal(text){
   for(const k in ORDINALS){if(has(text,k))return ORDINALS[k];}
   const zo={"第一":0,"第二":1,"第三":2,"第四":3,"最后":-1};
   for(const k in zo){if(text.includes(k))return zo[k];}
   return null;
 }
+// Is `term` negated in `text` ("no electrolytes", "not the mango", "不要芒果")? Used so a reference to a product
+// the shopper is EXCLUDING isn't read as a request for it.
+function negatedTerm(text,term){
+  const t=term.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&');
+  if(CJK.test(term))return new RegExp("(不要|不想|不用|别|没有|不喜欢|不加|去掉|不放|除了)"+t).test(text);
+  return new RegExp("\\b(no|not|without|dont|hate|avoid|skip|hold|minus|except|but not)\\s+(?:\\w+\\s+){0,2}"+t+"\\w*\\b").test(text);   // \\w* so "no electrolytes" negates the singular "electrolyte"
+}
+function anyHasUnnegated(text,list){return list.some(p=>has(text,p)&&!negatedTerm(text,p));}
 function referencedProduct(text,pool){
-  const hits=DISTINCTIVE.filter(d=>text.includes(d));
+  const hits=DISTINCTIVE.filter(d=>text.includes(d)&&!negatedTerm(text,d));   // "not the mango" must not resolve to mango
   if(!hits.length)return null;
   let best=null,bestN=0;
   for(const p of pool){const hay=(p.name+" "+p.flavor+" "+p.keywords.join(" ")+" "+(ZH_NAME[p.id]||"")).toLowerCase();
@@ -627,6 +651,10 @@ function doRank(reason){
     // progress (empties served_in / clears caffeine / +1 sweetness up to 5), so this always terminates.
     if(c.served_in.length){c.served_in=[];return retry("relax temperature");}
     if(c.caffeine!=null){c.caffeine=null;return retry("relax caffeine");}
+    // "a juice without sugar": nothing in the wanted category is low-sugar. Respect an explicitly-stated no-sugar
+    // request (this message, not just a standing preference) by broadening to plain water (zero sugar) rather than
+    // busting the constraint into a sugary juice — but never when they explicitly named a sweet item ("ice cream").
+    if(c.notSweet&&anyHas(need.rawUtterance,NOT_SWEET)&&!need.functions.includes("treat_dessert")&&!need.functions.includes("hydration")){need.functions.push("hydration");return retry("no low-sugar option → add water");}
     if(c.max_sweetness!=null&&c.max_sweetness<5){c.max_sweetness++;return retry("relax sweetness +1");}
     reason.decision="no_match";C.lastReason=reason;C.state="ELICIT_NEED";
     return {kind:"say",text:L().noMatch};
@@ -720,7 +748,7 @@ function metaIntent(text){
   if(anyHas(text,SURPRISE)){
     const sc=scoreFunctions(text);
     const otherNeed=Object.keys(sc).some(f=>f!=="gift_novelty"&&sc[f]>=THRESHOLD)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,NOT_SWEET)||anyHas(text,YES_SWEET)||anyHas(text,GENERIC_DRINK)||anyHas(text,HEALTH_LEAN)||!!referencedProduct(text,CATALOG);
-    const explicitGift=anyHas(text,["gift","present","collectible","blind box","blindbox","mystery box","souvenir","for a friend","for my","birthday","礼物","礼品","盲盒","收藏","手办","送人","送朋友","送礼","送给"]);
+    const explicitGift=anyHasUnnegated(text,["gift","present","collectible","blind box","blindbox","mystery box","souvenir","for a friend","for my","birthday","礼物","礼品","盲盒","收藏","手办","送人","送朋友","送礼","送给"]);
     if(!otherNeed&&!explicitGift)return forceNeed(["hydration","rehydration_electrolytes","fruit_refreshment","treat_dessert"],text);
   }
   if(hasNeedSignal(text)) return null;
@@ -735,6 +763,8 @@ function handle(raw){
   const text=normalize(raw);
   C.history.push({role:"user",text:raw});
   if(anyHas(text,EXIT)){C.state="END";return {kind:"say",text:L().exit(C.cart.length>0),clear:true};}
+  // "clear the cart" / "remove everything" / 清空 — honoured from ANY state.
+  if(anyHas(text,CLEAR)){C.cart=[];C.queue=[];C.state="ELICIT_NEED";return {kind:"cleared",text:L().cartCleared};}
   // Checkout is honoured from ANY state (this is also where the always-enabled Checkout button routes).
   if(anyHas(text,STRONG_CHECKOUT)){
     if(!C.cart.length){C.state="ELICIT_NEED";return {kind:"say",text:L().cartEmptyElicit};}
@@ -834,12 +864,14 @@ function handle(raw){
   }
 
   if(C.state==="POST_ADD"){
+    const last=(C.need&&C.need.currentRec)||C.lastRec;
+    // "make it three" / "change to 2" / 改成两个 → SET the last item's quantity (not add more)
+    const sq=setQtyIntent(text);
+    if(sq!=null&&last){const line=C.cart.find(i=>i.id===last.id);
+      if(line){line.qty=Math.min(Math.max(1,sq),last.qty);return {kind:"added",product:last,qty:line.qty,capped:sq>last.qty,setTo:true};}}
     // "one more" / "N more" → re-add the item we just added
     const rq=readdQty(text);
-    if(rq!=null&&((C.need&&C.need.currentRec)||C.lastRec)){
-      const p=(C.need&&C.need.currentRec)||C.lastRec;
-      cartAdd(p,rq);return {kind:"added",product:p,qty:Math.min(rq,p.qty),capped:rq>p.qty};
-    }
+    if(rq!=null&&last){cartAdd(last,rq);return {kind:"added",product:last,qty:Math.min(rq,last.qty),capped:rq>last.qty};}
     // done → checkout (soft done-cues or a bare "no"; NOT when browsing, naming a product, or stating a need)
     if((anyHas(text,CHECKOUT_CUES)||anyHas(text,DONE_NO))&&!anyHas(text,MORE_CUES)&&!anyHas(text,BROWSE)&&!scoreFunctions(text).length&&!referencedProduct(text,CATALOG)){
       if(!C.cart.length){C.state="ELICIT_NEED";return {kind:"say",text:L().cartEmptyElicit};}
@@ -943,6 +975,7 @@ function render(r){
     botSay(`${esc(o.pre)}${recCard(r.rec)}<div style="margin-top:7px">${esc(o.ask)}</div>`);}
   else if(r.kind==="added"){botSay((r.next?L().addedMore:L().added)(pname(r.product),r.qty,r.capped));if(r.next)render(r.next);}   // compound: chain the next queued item
   else if(r.kind==="removed") botSay(L().removed(pname(r.product)));
+  else if(r.kind==="cleared") botSay(esc(r.text));
   else if(r.kind==="options") botSay(L().options(r.options));
   else if(r.kind==="checkout"){
     const plan=r.items.map(i=>L().planRow(zh()?DIRW_ZH[i.location.turn_direction]:DIRW[i.location.turn_direction],i.qty,i.ett,pname(byId(i.id)))).join("");
