@@ -118,6 +118,37 @@ E.reset();
 r = turn("no juice, just water");
 ok("  \"no juice, just water\" -> a water, not a juice", r.kind === "recommend" && !/Juice/i.test(rec(r)), rec(r));
 
+section("FIX · generic \"a drink\" stays on the rules and NEVER yields a gift/blind box (was: escalate → LLM picked a blind box)");
+["something to drink", "i want a drink", "give me a drink", "can i get a beverage", "just want something to drink"].forEach(m => {
+  E.reset();
+  r = turn(m);
+  ok("  \"" + m + "\" -> recommend (not escalate)", r.kind === "recommend", r.kind);
+  ok("    -> a real drink, never a Blind Box / Collectible / Ice Cream", r.rec && !/Blind Box|Collectible|Ice Cream/i.test(rec(r)), rec(r));
+});
+// a bare, unqualified drink request should default to plain water (safest literal reading)
+E.reset();
+r = turn("something to drink");
+ok("  bare \"something to drink\" -> plain water default", /Water/i.test(rec(r)) && !/Electrolyte/i.test(rec(r)), rec(r));
+// a specific flavour/function in the same sentence still outranks the generic "drink" signal
+E.reset();
+r = turn("a fruity drink");
+ok("  \"a fruity drink\" -> juice wins over the generic drink cue", /Juice/i.test(rec(r)), rec(r));
+// "cold drink" is a chilled beverage, NOT the ice cream (the weak "cold"=dessert cue is dropped for a drink request)
+E.reset();
+r = turn("i just want a cold drink");
+ok("  \"a cold drink\" -> a chilled water, not Ice Cream", /Water/i.test(rec(r)) && !/Ice Cream/i.test(rec(r)), rec(r));
+// "give me a drink" — the incidental "give" (a gift cue) must not make it a blind box
+E.reset();
+r = turn("give me a drink");
+ok("  \"give me a drink\" -> a drink, not a gift", !/Blind Box|Collectible/i.test(rec(r)), rec(r));
+E.reset();
+r = turn("a drink to recover after the gym");
+ok("  \"a drink ... after the gym\" -> electrolyte wins", /Electrolyte/i.test(rec(r)), rec(r));
+// "energy drink" must STILL hit the honest no-caffeine reply, not a plain-water rec
+E.reset();
+r = turn("do you have an energy drink");
+ok("  \"energy drink\" -> honest no-caffeine reply (unchanged)", r.kind === "say" && /caffeinated/i.test(r.text), { kind: r.kind, text: (r.text || "").slice(0, 40) });
+
 /* ============================ FIXES ============================ */
 section("FIX · checkout is honoured from ANY state (was a bug in RECOMMEND)");
 E.reset();
@@ -225,6 +256,12 @@ r = turn("来两个");                                       // "make it two" (n
 E.reset();
 turn("我想要水"); r = turn("来两瓶");     // I want water; two bottles
 ok("  中文 quantity \"来两瓶\" -> added 2", r.kind === "added" && r.qty === 2, { kind: r.kind, qty: r.qty });
+E.reset();
+r = turn("想喝点东西");                                       // "want something to drink" -> a real drink, not a gift
+ok("  中文 \"想喝点东西\" -> recommend a drink, not a gift", r.kind === "recommend" && !/Blind Box|Collectible|盲盒|收藏/i.test(rec(r)), rec(r));
+E.reset();
+r = turn("来点喝的");                                         // "get me a drink"
+ok("  中文 \"来点喝的\" -> recommend (not escalate)", r.kind === "recommend", r.kind);
 E.reset();
 r = turn("结账");                                             // checkout, empty cart
 ok("  中文 empty checkout -> graceful say", r.kind === "say", r.kind);

@@ -333,6 +333,10 @@ const READD=["one more","another one","one of those too","one of those as well",
 const NUMWORDS={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,couple:2,pair:2,few:3};
 const ORDINALS={first:0,"1st":0,second:1,"2nd":1,third:2,"3rd":2,fourth:3,last:-1};
 const DISTINCTIVE=["black","green","purple","pink","orange","blue","white grape","white","grape","mango","guava","pomegranate","jasmine","vanilla","evian","nongfu","gareer","electrolyte","juice","water","collectible","blind box","ice cream","黑色","绿色","紫色","粉色","橙色","蓝色","白葡萄","葡萄","芒果","番石榴","石榴","茉莉","依云","农夫","冰淇淋","盲盒","矿泉水"];
+// A bare, unqualified "want a drink" with no flavour/function cue. Matched by whole word (singular) so a
+// preference statement like "I don't like sweet drinks" (plural) is NOT read as an order. When this is the
+// only signal we default to plain water — a drink request must never fall through to the LLM and come back a blind box.
+const GENERIC_DRINK=["drink","a drink","something to drink","get a drink","beverage","喝的","喝点","想喝","喝东西","来点喝的","来杯","饮料","饮品"];
 
 const CJK=/[一-鿿]/;
 function normalize(t){return t.toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9'一-鿿\s-]/g," ").replace(/\s+/g," ").trim();}
@@ -555,6 +559,14 @@ function infer(){
   const need=C.need;
   need.scores=scoreFunctions(need.rawUtterance);
   need.functions=inferredFrom(need.scores);
+  // "I want a drink": prefer a beverage. Drop WEAK non-beverage false-positives — the "give" in "give me a
+  // drink" (gift) or the "cold" in "a cold drink" (dessert) — while still honouring a strong, explicit treat/gift
+  // signal (e.g. "a drink and a blind box"). If nothing's left, default to plain water so it's never a mystery box.
+  if(anyHas(need.rawUtterance,GENERIC_DRINK)){
+    const BEVERAGE=["hydration","rehydration_electrolytes","fruit_refreshment"];
+    need.functions=need.functions.filter(f=>BEVERAGE.includes(f)||need.scores[f]>=THRESHOLD);
+    if(need.functions.length===0)need.functions=["hydration"];
+  }
   extractInto(need.constraints,need.rawUtterance);
   persistPrefs(need.rawUtterance);
   const fns=need.functions;
@@ -610,7 +622,7 @@ const THANKS=["thanks","thank you","thankyou","thx","cheers","ta","appreciate it
 const HELP=["help","what do you have","what do you sell","whats available","what is available","menu","what can i get","what are my options","whats good","what is good","what should i get","what you got","有什么","有啥","卖什么","菜单","有什么好","都有什么"];
 const SURPRISE=["surprise me","you pick","you choose","you decide","whatever","dunno","i dont know","not sure","recommend something","suggest something","recommend me something","what do you recommend","recommend","suggest","pick for me","up to you","anything is fine","anything works","anything you like","anything at all","just anything","随便","随便推荐","你决定","你选","都行","随你","帮我选","推荐一个","看着来","随便来"];   // bare "anything" removed — it mis-fired on "anything with caffeine" etc.
 function hasNeedSignal(text){
-  return Object.keys(scoreFunctions(text)).length>0||anyHas(text,NOT_SWEET)||anyHas(text,YES_SWEET)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,NO_CAF)||!!referencedProduct(text,CATALOG);
+  return Object.keys(scoreFunctions(text)).length>0||anyHas(text,NOT_SWEET)||anyHas(text,YES_SWEET)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,NO_CAF)||anyHas(text,GENERIC_DRINK)||!!referencedProduct(text,CATALOG);
 }
 function forceNeed(fns,text){
   C.need=newNeed();C.need.rawUtterance=text;C.need.functions=fns;
@@ -858,19 +870,21 @@ async function loadLLM(onProgress){
 // Compact one-line-per-item table instead of full JSON — far fewer prompt tokens (keywords/blurb dropped; they're
 // only for the rule engine, the LLM doesn't need them). Fewer tokens = faster prefill on a local model.
 function catalogForLLM(){
-  return CATALOG.map(p=>[p.id,zh()?(ZH_NAME[p.id]||p.name):p.name,p.function_tags.join("/"),p.sweetness,p.sugar_level,p.served,p.caffeine?"caffeine":"caffeine-free",p.qty].join(" | ")).join("\n");
+  return CATALOG.map(p=>[p.id,zh()?(ZH_NAME[p.id]||p.name):p.name,p.category,p.function_tags.join("/"),p.sweetness,p.sugar_level,p.served,p.caffeine?"caffeine":"caffeine-free",p.qty].join(" | ")).join("\n");
 }
 function sysPrompt(){
   return [
 "You are the in-store recommendation brain for a retail vending robot. Help one shopper pick the best drink or treat, build a cart across the conversation, and check out when done.",
 zh()?"务必用简体中文和顾客对话（message 字段用中文）。":"Reply to the shopper in English (the message field in English).",
 "Function tags (fixed set): hydration, rehydration_electrolytes, fruit_refreshment, treat_dessert, gift_novelty.",
-"Rules: recommend only in-stock catalog items, by their exact id, one at a time. Honour constraints — not sweet ⇒ sweetness ≤ 2 & low/no sugar; cold ⇒ chilled/frozen; no caffeine ⇒ caffeine false. Remember stated preferences. If the need is unclear, ask ONE clarifying question. When the shopper agrees to buy, add_to_cart; when they're done, checkout.",
+"PRODUCT KINDS: Drinks = Mineral Water, NFC Juice, Electrolyte Water. Frozen treat = Ice Cream. Gifts = Blind Box and Collectible — these are toy/figure novelties, NOT food or drink and cannot be consumed.",
+"MATCH THE KIND TO THE REQUEST. If the shopper wants something to drink, is thirsty, or asks for a beverage/water/juice, recommend ONLY a Drink. If they want a sweet cold treat, the Ice Cream fits. Recommend a Blind Box or Collectible ONLY when the shopper explicitly wants a gift, collectible, surprise toy, or something to give someone. NEVER offer a Blind Box or Collectible in reply to a request for a drink or food — that is always wrong.",
+"Rules: recommend only in-stock catalog items, by their exact id, one at a time. Honour constraints — not sweet ⇒ sweetness ≤ 2 & low/no sugar; cold ⇒ chilled/frozen; no caffeine ⇒ caffeine false. Remember stated preferences. If the need is genuinely unclear (you cannot tell whether they want a drink, a treat, or a gift), ask ONE clarifying question instead of guessing. When the shopper agrees to buy, add_to_cart; when they're done, checkout.",
 "Respond with ONE JSON object and nothing else.",
 '"action" MUST be exactly ONE of these single words (never the list): recommend, add_to_cart, remove_from_cart, checkout, ask_clarifying, reply. "sku" is exactly ONE catalog id (required for recommend/add_to_cart/remove_from_cart). "qty" is an integer for add_to_cart (default 1). "message" is the sentence shown to the shopper.',
 'Example: {"action":"recommend","sku":"evian_natural_mineral_water","message":"..."}',
 "The live cart is provided each turn and is authoritative.",
-"CATALOG — one item per line, fields: id | name | function_tags | sweetness(0-5) | sugar | served | caffeine | qty\n"+catalogForLLM()
+"CATALOG — one item per line, fields: id | name | category | function_tags | sweetness(0-5) | sugar | served | caffeine | qty\n"+catalogForLLM()
   ].join("\n");
 }
 // tolerant of small-model sloppiness: enum echoed in "action", multiple/space-joined "sku"
