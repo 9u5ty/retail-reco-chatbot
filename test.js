@@ -97,6 +97,20 @@ ok("  \"don't like sweet\" persisted to profile", E.C().profile.notSweet === tru
 r = turn("I'm thirsty");
 ok("  later \"thirsty\" avoids sugary juice", r.kind === "recommend" && r.rec.sugar_level !== "high", { name: rec(r), sugar: r.rec && r.rec.sugar_level });
 
+section("EN · flavour-preference memory (a soft nudge, learned only from a preference statement)");
+E.reset();
+turn("i love guava");
+ok("  \"i love guava\" -> remembers likeFlavor=guava", E.C().profile.likeFlavor === "guava", E.C().profile.likeFlavor);
+turn("yes");                                            // buy that guava -> POST_ADD
+r = turn("a fruity drink");                             // a later, separate juice need
+ok("  later generic \"a fruity drink\" leans guava", r.kind === "recommend" && /Guava/i.test(rec(r)), rec(r));
+E.reset();
+turn("a mango juice");                                  // a one-off ORDER must NOT set a standing preference
+ok("  \"a mango juice\" (an order) does NOT set a flavour preference", E.C().profile.likeFlavor === null, E.C().profile.likeFlavor);
+E.reset();
+turn("i really like white grape");
+ok("  \"white grape\" beats the shorter \"grape\" match", E.C().profile.likeFlavor === "white grape", E.C().profile.likeFlavor);
+
 section("EN · references, options + ordinal, refine loop");
 E.reset();
 turn("I want a gift");

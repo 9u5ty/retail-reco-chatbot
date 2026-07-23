@@ -67,9 +67,21 @@
   .bub{padding:10px 13px;border-radius:13px;font-size:.92rem;line-height:1.5;border:1px solid var(--line);}
   .row.bot .bub{background:var(--bot);border-top-left-radius:4px;}
   .row.user .bub{background:var(--user);border-top-right-radius:4px;}
-  .bub .rec{margin-top:8px;padding:9px 11px;border-radius:10px;background:rgba(79,140,255,.1);border:1px solid rgba(79,140,255,.35);display:flex;gap:10px;align-items:center;}
-  .bub .rec .nm{font-weight:700;color:var(--brand-ink);}
-  .bub .rec .px{font-size:.76rem;color:var(--ink-2);}
+  .bub .rec{margin-top:9px;padding:11px;border-radius:12px;background:rgba(79,140,255,.09);border:1px solid rgba(79,140,255,.3);display:flex;gap:11px;align-items:flex-start;}
+  .bub .rec .thumb{width:46px;height:46px;flex:none;border-radius:12px;display:grid;place-items:center;font-size:25px;
+    background:var(--panel-2);background:color-mix(in srgb,var(--cc) 20%,var(--panel-2));
+    border:1px solid var(--line);border-color:color-mix(in srgb,var(--cc) 55%,transparent);
+    box-shadow:0 5px 16px -7px var(--cc);}
+  .bub .rec .recbody{flex:1;min-width:0;}
+  .bub .rec .nm{font-weight:700;color:var(--ink);font-size:.95rem;line-height:1.25;}
+  .bub .rec .px{font-size:.75rem;color:var(--ink-2);margin-top:1px;}
+  .bub .rec .badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px;}
+  .rb{font-size:.65rem;padding:2px 7px;border-radius:6px;border:1px solid var(--line);color:var(--ink-2);background:var(--panel);display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  .rb.g{color:var(--good);border-color:rgba(51,192,127,.4);background:rgba(51,192,127,.08);}
+  .rb.w{color:var(--warn);border-color:rgba(240,176,74,.4);background:rgba(240,176,74,.08);}
+  .rb.b{color:var(--bad);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.08);}
+  .rb.novel{color:var(--brand-ink);border-color:rgba(79,140,255,.4);background:rgba(79,140,255,.1);}
+  .rb.sweetb{padding:3px 7px;} .rb .sweet i{width:6px;height:6px;}
   .bub ol{margin:8px 0 4px;padding-left:20px;} .bub ol li{margin:3px 0;}
   .bub .plan{margin-top:8px;font-size:.82rem;color:var(--ink-2);border-left:2px solid var(--good);padding-left:10px;}
   .bub .plan b{color:var(--good);}
@@ -107,7 +119,8 @@
   .pref.none{color:var(--muted);background:none;border-color:var(--line);}
   .cartlist{display:flex;flex-direction:column;gap:6px;}
   .cartitem{display:flex;align-items:center;gap:8px;font-size:.84rem;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:6px 10px;}
-  .cartitem .q{font-weight:800;color:var(--brand-ink);min-width:26px;}
+  .cartitem .ci{font-size:15px;flex:none;}
+  .cartitem .q{font-weight:800;color:var(--brand-ink);min-width:24px;}
   .cartitem .nm{flex:1;line-height:1.2;}
   .cartitem .rm{cursor:pointer;color:var(--muted);border:none;background:none;font-size:1rem;line-height:1;}
   .cartitem .rm:hover{color:var(--bad);}
@@ -230,9 +243,9 @@ const LX={
     ui:{chat:"Chatbot",reason:"Reasoning · scratchpad",session:"Session memory & cart",prefs:"Standing preferences (remembered)",cart:"Cart",checkout:"Check out",inv:"Store inventory",send:"Send",placeholder:"Tell the robot what you feel like…",empty:"Empty",noneYet:"None yet",reasonPlaceholder:"The bot's need → function → constraints → candidates reasoning shows here each turn.",
       skus:n=>`${n} SKUs`,tot:(l,u)=>`${l} line${l>1?"s":""} · ${u} unit${u>1?"s":""}`,
       legend:["<b>Highlighted</b> = matches need","<b>Green</b> = recommended","<b>Blue badge</b> = in cart","<b>Dim</b> = filtered out"],
-      prefAvoid:"Avoids sweet",prefLike:"Likes sweet",prefNoCaf:"Caffeine-free",inCart:n=>`×${n} in cart`,
-      ollLabel:"In-browser AI",ollHint:'Runs in your browser via WebGPU; downloads a ~1 GB model on first use. Needs Chrome/Edge or Safari 17+.',
-      ollNote:'🧠 In-browser AI mode (WebGPU). The first off-script message downloads a ~1 GB model, then caches it. If your browser can\'t run it, I\'ll fall back to the offline engine.',
+      prefAvoid:"Avoids sweet",prefLike:"Likes sweet",prefNoCaf:"Caffeine-free",prefFlavor:f=>"❤ Likes "+cap(f),inCart:n=>`×${n} in cart`,
+      ollLabel:"In-browser AI",ollHint:'Runs in your browser via WebGPU; downloads a ~2 GB model on first use (falls back to a smaller one on limited GPUs). Needs Chrome/Edge or Safari 17+.',
+      ollNote:'🧠 In-browser AI mode (WebGPU). The first off-script message downloads the model (~2 GB, or a smaller fallback), then caches it. If your browser can\'t run it, I\'ll fall back to the offline engine.',
       llmErr:"The in-browser AI hit a snag — the offline assistant will take it from here:",
       noWebGPU:"This browser can't run the in-browser AI (it needs WebGPU — try Chrome, Edge, or Safari 17+). The offline assistant will help instead:",
       foot:'Powered by an <b>in-browser LLM</b> (WebLLM · WebGPU) — no cloud, no key, no install. The rule engine answers offline; the model loads on first use. Action schema in <code>ENGINE.md</code>.'},
@@ -272,9 +285,9 @@ const LX={
     ui:{chat:"聊天机器人",reason:"推理 · 草稿",session:"会话记忆与购物车",prefs:"记住的偏好",cart:"购物车",checkout:"结账",inv:"门店库存",send:"发送",placeholder:"告诉机器人你想要点什么…",empty:"空",noneYet:"暂无",reasonPlaceholder:"机器人每一轮的推理（需求 → 功能 → 约束 → 候选）都会显示在这里。",
       skus:n=>`${n} 个 SKU`,tot:(l,u)=>`${l} 项 · ${u} 件`,
       legend:["<b>高亮</b> = 匹配需求","<b>绿框</b> = 已推荐","<b>蓝标</b> = 在购物车","<b>灰色</b> = 已过滤"],
-      prefAvoid:"不喜甜",prefLike:"喜欢甜",prefNoCaf:"无咖啡因",inCart:n=>`已加 ×${n}`,
-      ollLabel:"浏览器内 AI",ollHint:'在浏览器中通过 WebGPU 运行，首次使用会下载约 1 GB 模型。需 Chrome/Edge 或 Safari 17+。',
-      ollNote:'🧠 浏览器内 AI 模式（WebGPU）。首次遇到规则无法处理的消息时会下载约 1 GB 模型并缓存。若浏览器无法运行，将回退到离线引擎。',
+      prefAvoid:"不喜甜",prefLike:"喜欢甜",prefNoCaf:"无咖啡因",prefFlavor:f=>"❤ 喜欢"+(ZH_FLAVOR[f]||f),inCart:n=>`已加 ×${n}`,
+      ollLabel:"浏览器内 AI",ollHint:'在浏览器中通过 WebGPU 运行，首次使用会下载约 2 GB 模型（显存有限时自动回退到更小的模型）。需 Chrome/Edge 或 Safari 17+。',
+      ollNote:'🧠 浏览器内 AI 模式（WebGPU）。首次遇到规则无法处理的消息时会下载模型（约 2 GB，或更小的备用模型）并缓存。若浏览器无法运行，将回退到离线引擎。',
       llmErr:"浏览器内 AI 出了点问题 —— 交给离线助手继续：",
       noWebGPU:"当前浏览器无法运行浏览器内 AI（需要 WebGPU —— 请用 Chrome、Edge 或 Safari 17+）。改由离线助手协助：",
       foot:'由<b>浏览器内大模型</b>（WebLLM · WebGPU）驱动 —— 无云端、无密钥、无需安装。规则引擎离线应答，模型首次使用时加载。动作模式见 <code>ENGINE.md</code>。'},
@@ -366,7 +379,12 @@ function has(text,phrase){
 }
 function anyHas(text,list){return list.some(p=>has(text,p));}
 function cloneC(c){return JSON.parse(JSON.stringify(c));}
-function blankConstraints(){return {max_sweetness:null,notSweet:false,wantSweet:false,prefer_sugar:[],served_in:[],caffeine:null};}
+function blankConstraints(){return {max_sweetness:null,notSweet:false,wantSweet:false,prefer_sugar:[],served_in:[],caffeine:null,likeFlavor:null};}
+// Remembered flavour love ("I love mango" → future picks lean mango). A soft ranking boost only — it never filters a
+// category out, so it can't cause a no-match. Longer names first so "white grape" wins over "grape".
+const FLAVOR_WORDS=[["white grape","white grape"],["grape","grape"],["orange","orange"],["mango","mango"],["guava","guava"],["pomegranate","pomegranate"],["jasmine","jasmine"],["vanilla","vanilla"],["白葡萄","white grape"],["葡萄","grape"],["橙","orange"],["芒果","mango"],["番石榴","guava"],["石榴","pomegranate"],["茉莉","jasmine"],["香草","vanilla"]];
+const LIKE_CUES=["i like","i love","i really like","i prefer","prefer the","favourite","favorite","my fav","fav is","im into","into the","fond of","i enjoy","love the","like the","always get","usually get","喜欢","爱喝","最爱","偏爱","我爱","超爱"];
+const ZH_FLAVOR={orange:"橙子","white grape":"白葡萄",grape:"葡萄",mango:"芒果",guava:"番石榴",pomegranate:"石榴",jasmine:"茉莉",vanilla:"香草"};
 
 /* --- fuzzy language understanding: stemming + typo tolerance --- */
 const STOP=new Set("a an the i im to for of and or my me you it is are am was want wanna need get gimme got have some something anything like feel feeling really just please would can could id we so am also bit really pretty kinda kind".split(" "));
@@ -461,7 +479,8 @@ function scoreProduct(p,fns,c,cueText){
   const sugarPref=c.prefer_sugar.includes(p.sugar_level)?1:0;
   const tempPref=c.served_in.length?(p.served===c.served_in[0]?1:(c.served_in.includes(p.served)?0.5:0)):0;
   const stock=p.qty>=10?1:p.qty>=3?0.5:0;
-  return {total:3*fnMatch+2*kov+fit+sugarPref+tempPref+stock,fnMatch,kov,fit};
+  const flavPref=c.likeFlavor&&p.flavor&&p.flavor.includes(c.likeFlavor)?2:0;   // remembered flavour love → soft nudge
+  return {total:3*fnMatch+2*kov+fit+sugarPref+tempPref+stock+flavPref,fnMatch,kov,fit};
 }
 function rank(need){
   const {functions:fns,constraints:c,offeredSkus,rawUtterance}=need;
@@ -592,6 +611,8 @@ function persistPrefs(text){
   if(anyHas(text,NOT_SWEET)){c.notSweet=true;c.wantSweet=false;c.max_sweetness=2;c.prefer_sugar=["none","low"];}
   else if(anyHas(text,YES_SWEET)){c.wantSweet=true;c.notSweet=false;c.max_sweetness=null;c.prefer_sugar=[];}
   if(anyHas(text,NO_CAF))c.caffeine=false;
+  // Remember a flavour love only when it's framed as a preference ("I love mango"), not a one-off order ("a mango juice").
+  if(anyHas(text,LIKE_CUES)){for(const [w,canon] of FLAVOR_WORDS){if(has(text,w)&&!negatedTerm(text,w)){c.likeFlavor=canon;break;}}}
 }
 function cartAdd(p,q){
   const ex=C.cart.find(i=>i.id===p.id);
@@ -928,8 +949,9 @@ function renderState(){stateEl.innerHTML=STATES.map(s=>`<span class="pill ${s===
 function renderSession(){
   const c=C.profile,u=L().ui,prefs=[];
   if(c.notSweet)prefs.push(u.prefAvoid);if(c.wantSweet)prefs.push(u.prefLike);if(c.caffeine===false)prefs.push(u.prefNoCaf);
+  if(c.likeFlavor)prefs.push(u.prefFlavor(c.likeFlavor));
   prefsEl.innerHTML=prefs.length?prefs.map(p=>`<span class="pref">${p}</span>`).join(""):`<span class="pref none">${u.noneYet}</span>`;
-  cartEl.innerHTML=C.cart.length?C.cart.map(i=>`<div class="cartitem"><span class="q">×${i.qty}</span><span class="nm">${esc(pname(byId(i.id)))}</span><button class="rm" data-id="${i.id}" title="remove">✕</button></div>`).join(""):`<div class="cartempty">${u.empty}</div>`;
+  cartEl.innerHTML=C.cart.length?C.cart.map(i=>`<div class="cartitem"><span class="ci">${catVisual(byId(i.id)).i}</span><span class="q">×${i.qty}</span><span class="nm">${esc(pname(byId(i.id)))}</span><button class="rm" data-id="${i.id}" title="remove">✕</button></div>`).join(""):`<div class="cartempty">${u.empty}</div>`;
   const units=C.cart.reduce((a,i)=>a+i.qty,0);
   cartTotEl.textContent=C.cart.length?u.tot(C.cart.length,units):"";
   checkoutBtn.disabled=!C.cart.length;
@@ -942,7 +964,7 @@ function renderReason(){
   const r=C.lastReason;
   if(!r){reasonEl.innerHTML='<span class="placeholder">'+esc(L().ui.reasonPlaceholder)+'</span>';return;}
   const sc=Object.entries(r.scores).map(([k,v])=>`${k}:${v}`).join(", ")||"—";
-  const cons=[];if(r.constraints.max_sweetness!=null)cons.push(`sweetness ≤ ${r.constraints.max_sweetness}`);if(r.constraints.wantSweet)cons.push("prefer sweet");if(r.constraints.served_in.length)cons.push("served ∈ "+r.constraints.served_in.join("/"));if(r.constraints.caffeine===false)cons.push("caffeine-free");
+  const cons=[];if(r.constraints.max_sweetness!=null)cons.push(`sweetness ≤ ${r.constraints.max_sweetness}`);if(r.constraints.wantSweet)cons.push("prefer sweet");if(r.constraints.served_in.length)cons.push("served ∈ "+r.constraints.served_in.join("/"));if(r.constraints.caffeine===false)cons.push("caffeine-free");if(r.constraints.likeFlavor)cons.push("likes "+r.constraints.likeFlavor);
   const lines=[];
   lines.push(`<span class="ln"><span class="rk">need       </span><span class="rv">${esc(r.need||"—")}</span></span>`);
   lines.push(`<span class="ln"><span class="rk">scores     </span><span class="rv">${esc(sc)}</span></span>`);
@@ -965,9 +987,27 @@ const TYPING_MIN=40, TYPING_MAX=130;
 function botSay(html){const t=addMsg("bot",'<span class="typing"><span></span><span></span><span></span></span>');
   const delay=Math.min(TYPING_MAX,TYPING_MIN+html.replace(/<[^>]+>/g,"").length*0.5);
   setTimeout(()=>{t.querySelector(".bub").innerHTML=html;msgsEl.scrollTop=msgsEl.scrollHeight;refresh();},delay);}
-function recCard(p){const isNovel=p.category==="Blind Box"||p.category==="Collectible";
-  const sub=zh()?`${pcat(p)} · ${ZH_SUG[p.sugar_level]} · ${ZH_SERV[p.served]}`:`${p.category}${p.flavor&&!isNovel?" · "+cap(p.flavor):""} · ${cap(p.sugar_level)} sugar · ${cap(p.served)}`;
-  return `<div class="rec"><div><div class="nm">${esc(pname(p))}</div><div class="px">${esc(sub)}</div></div></div>`;}
+// A category's icon + accent colour — CSS-drawn, no brand imagery (colour drives the thumbnail tint & glow).
+const CAT_VISUAL={"Mineral Water":{i:"💧",c:"#5bb8ff"},"NFC Juice":{i:"🧃",c:"#ff9f45"},"Electrolyte Water":{i:"⚡",c:"#39d0b0"},"Ice Cream":{i:"🍦",c:"#ff7eb6"},"Blind Box":{i:"🎁",c:"#a78bfa"},"Collectible":{i:"🌟",c:"#f4c04a"}};
+function catVisual(p){return CAT_VISUAL[p.category]||{i:"🛍️",c:"#8aa0bd"};}
+function sweetDots(n){let s='<span class="sweet" title="'+(zh()?"甜度":"sweetness")+' '+n+'/5">';for(let i=0;i<5;i++)s+='<i class="'+(i<n?"f":"")+'"></i>';return s+"</span>";}
+const SERV_ICON={chilled:"❄️",frozen:"🧊",ambient:"🌡️"};
+function recCard(p){
+  const isNovel=p.category==="Blind Box"||p.category==="Collectible";
+  const v=catVisual(p);
+  const sub=zh()?`${pcat(p)}${p.flavor&&!isNovel?" · "+cap(p.flavor):""}`:`${p.category}${p.flavor&&!isNovel?" · "+cap(p.flavor):""}`;
+  let badges;
+  if(isNovel){
+    badges=`<span class="rb novel">${zh()?"🎁 惊喜":"🎁 Surprise inside"}</span><span class="rb">${SERV_ICON[p.served]||""} ${zh()?ZH_SERV[p.served]:cap(p.served)}</span>`;
+  }else{
+    const sc=p.sugar_level==="high"?"b":p.sugar_level==="medium"?"w":"g";
+    badges=`<span class="rb sweetb">${sweetDots(p.sweetness)}</span>`+
+      `<span class="rb ${sc}">${zh()?ZH_SUG[p.sugar_level]:cap(p.sugar_level)+" sugar"}</span>`+
+      `<span class="rb">${SERV_ICON[p.served]||""} ${zh()?ZH_SERV[p.served]:cap(p.served)}</span>`+
+      `<span class="rb">${p.calories_kcal} ${zh()?"千卡":"kcal"}</span>`;
+  }
+  return `<div class="rec"><div class="thumb" style="--cc:${v.c}">${v.i}</div><div class="recbody"><div class="nm">${esc(pname(p))}</div><div class="px">${esc(sub)}</div><div class="badges">${badges}</div></div></div>`;
+}
 
 /* ===================== RENDER ===================== */
 function render(r){
@@ -1000,9 +1040,11 @@ function refreshGreetingBubble(){
 // FIRST escalation it downloads the model (~1 GB) from a CDN and caches it; after that it's instant. If WebGPU is
 // unavailable or the load fails, we fall back to a single clarifying question, so the file works for everyone.
 let ollHistory=[];
-// One bilingual model keeps the download to a single fetch. Swap for any other prebuilt WebLLM id:
-// smaller/faster → "Qwen2.5-0.5B-Instruct-q4f16_1-MLC"; higher quality → "Llama-3.2-3B-Instruct-q4f16_1-MLC".
-const WEBLLM_MODEL="Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+// Bilingual, prebuilt WebLLM ids, tried in order. Qwen2.5-3B is a lot sharper than 1.5B on the rare off-script turn
+// and still strong in Chinese; if it can't load (older GPU / limited memory) we fall back to the smaller 1.5B, so
+// no device is left without the AI. Now that the rules answer almost everything, the bigger first-load is rarely paid.
+const WEBLLM_MODELS=["Qwen2.5-3B-Instruct-q4f16_1-MLC","Qwen2.5-1.5B-Instruct-q4f16_1-MLC"];
+let WEBLLM_ACTIVE=WEBLLM_MODELS[0];
 let _mlc=null,_mlcLoading=null;
 async function loadLLM(onProgress){
   if(_mlc)return _mlc;
@@ -1010,7 +1052,12 @@ async function loadLLM(onProgress){
     _mlcLoading=(async()=>{
       if(!navigator.gpu)throw new Error("no-webgpu");
       const webllm=await import("https://esm.run/@mlc-ai/web-llm");   // loaded lazily, only when an escalation needs it
-      return await webllm.CreateMLCEngine(WEBLLM_MODEL,{initProgressCallback:onProgress});
+      let lastErr;
+      for(const id of WEBLLM_MODELS){
+        try{const e=await webllm.CreateMLCEngine(id,{initProgressCallback:onProgress});WEBLLM_ACTIVE=id;return e;}
+        catch(err){lastErr=err;}   // bigger model may OOM or be unavailable → try the next (smaller) one
+      }
+      throw lastErr;
     })();
   }
   try{_mlc=await _mlcLoading;return _mlc;}catch(e){_mlcLoading=null;throw e;}
@@ -1042,7 +1089,7 @@ function applyAction(a){
   const act=ACTIONS.find(x=>String(a.action||"").toLowerCase().includes(x))||"reply";  // recommend-first = safest read of an echoed enum
   let sku=null;
   if(a.sku){sku=String(a.sku).split(/[^A-Za-z0-9_]+/).map(s=>s.toLowerCase()).find(id=>byId(id))||null;}  // first valid id
-  C.llmReason={engine:"In-browser · "+WEBLLM_MODEL.replace(/-q4.*$/,""),action:act,sku};
+  C.llmReason={engine:"In-browser · "+WEBLLM_ACTIVE.replace(/-q4.*$/,""),action:act,sku};
   const p=sku?byId(sku):null;
   // hand the resulting state back to the rule engine so the NEXT turn can be answered instantly by the rules.
   if(act==="recommend"&&p){C.llmRec=p;C.lastRec=p;C.lastOptions=[p];
