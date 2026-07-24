@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -156,7 +156,7 @@
   <section class="card chat">
     <div class="hd"><span class="dot"></span> <span id="t-chat">Chatbot</span>
       <span style="flex:1"></span>
-      <span class="langsw"><button id="lang-en" class="on">EN</button><button id="lang-zh">中文</button></span>
+      <span class="langsw"><button id="lang-en">EN</button><button id="lang-zh" class="on">中文</button></span>
     </div>
     <div class="msgs" id="msgs"></div>
     <div class="composer">
@@ -223,7 +223,7 @@ const DATA = {
 const CATALOG = DATA.products;
 
 /* ===================== i18n (English / 中文) ===================== */
-let LANG="en";
+let LANG="zh";          // default to Chinese on load; per-message auto-detect still switches to EN if the shopper types English
 let LANG_SOURCE="auto"; // "manual" when the user explicitly chose EN/中文, otherwise auto-detect from the input
 const zh=()=>LANG==="zh";
 const byId=id=>CATALOG.find(p=>p.id===id);
@@ -1188,7 +1188,7 @@ document.getElementById("lang-en").onclick=()=>setLangUI("en","manual");
 document.getElementById("lang-zh").onclick=()=>setLangUI("zh","manual");
 checkoutBtn.onclick=()=>{if(C.cart.length){const m=zh()?"结账":"check me out";addMsg("user",m);respondRaw(m);}};
 inEl.addEventListener("keydown",e=>{if(e.key==="Enter")send();});
-reset();setLangUI("en","auto");   // reset() initialises C first, then labels are set
+reset();setLangUI("zh","auto");   // reset() initialises C first, then labels are set (default language: Chinese)
 </script>
 </body>
 </html>
