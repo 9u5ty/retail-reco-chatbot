@@ -307,6 +307,34 @@ r = turn("不要芒果，要别的果汁");
 ok("  中文 \"不要芒果，要别的果汁\" -> a juice that is NOT mango", r.kind === "recommend" && !/Mango/i.test(rec(r)) && /Juice/i.test(rec(r)), rec(r));
 E.setLang("en");
 
+section("FIX · a ruled-out product is EXCLUDED, not just un-boosted (was: default fell back to it)");
+E.reset();
+r = turn("something fruity but not the orange one");
+ok("  \"...not the orange one\" -> not orange juice", r.kind === "recommend" && !/Orange/i.test(rec(r)) && /Juice/i.test(rec(r)), rec(r));
+E.reset();
+r = turn("a juice thats not orange and not guava");
+ok("  \"not orange and not guava\" -> mango is the only one left", r.kind === "recommend" && /Mango/i.test(rec(r)), rec(r));
+E.reset();
+turn("something fruity"); r = turn("no mango");
+ok("  mid-rec \"no mango\" excludes mango, keeps a juice (never returns mango)", r.kind === "recommend" && !/Mango/i.test(rec(r)), rec(r));
+
+section("FEATURE · emoji ordering");
+[["🥤", /Water/i], ["🍦", /Ice Cream/i], ["🎁", /Blind Box|Collectible/i], ["🧃", /Juice/i], ["⚡", /Electrolyte/i], ["🥭", /Mango/i]].forEach(([m, re]) => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> " + re, r.kind === "recommend" && re.test(rec(r)), { kind: r.kind, rec: rec(r) });
+});
+E.reset();
+turn("🍦 and 💧"); r = turn("yes");
+ok("  \"🍦 and 💧\" is a compound (ice cream, then water)", r.kind === "added" && r.next && /Water/i.test(r.next.rec.name), r.next && r.next.rec && r.next.rec.name);
+
+section("FIX · empty / punctuation / all-filler input re-prompts instead of escalating to the LLM");
+["...", "???", "   ", "a", "ok so like", "umm hmm"].forEach(m => {
+  E.reset(); r = turn(m);
+  ok("  \"" + m + "\" -> a spoken re-prompt (say, not escalate)", r.kind === "say", r.kind);
+});
+E.reset();
+ok("  a genuine unknown word (\"banana\") still escalates", turn("banana").kind === "escalate");
+
 section("FEATURE · cart editing: change quantity, and clear the whole cart");
 E.reset();
 turn("i want water"); turn("yes"); r = turn("actually make it three");

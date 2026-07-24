@@ -240,7 +240,7 @@ function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
 const L=()=>LX[LANG];
 const LX={
   en:{
-    ui:{chat:"Chatbot",reason:"Reasoning · scratchpad",session:"Session memory & cart",prefs:"Standing preferences (remembered)",cart:"Cart",checkout:"Check out",inv:"Store inventory",send:"Send",placeholder:"Tell the robot what you feel like…",empty:"Empty",noneYet:"None yet",reasonPlaceholder:"The bot's need → function → constraints → candidates reasoning shows here each turn.",
+    ui:{chat:"Chatbot",reason:"Reasoning · scratchpad",session:"Session memory & cart",prefs:"Standing preferences (remembered)",cart:"Cart",checkout:"Check out",inv:"Store inventory",send:"Send",placeholder:"Tell the robot what you feel like…",empty:"Empty",noneYet:"None yet",resetLabel:"Restart conversation",removeLabel:n=>"Remove "+n,composerLabel:"Message the robot",reasonPlaceholder:"The bot's need → function → constraints → candidates reasoning shows here each turn.",
       skus:n=>`${n} SKUs`,tot:(l,u)=>`${l} line${l>1?"s":""} · ${u} unit${u>1?"s":""}`,
       legend:["<b>Highlighted</b> = matches need","<b>Green</b> = recommended","<b>Blue badge</b> = in cart","<b>Dim</b> = filtered out"],
       prefAvoid:"Avoids sweet",prefLike:"Likes sweet",prefNoCaf:"Caffeine-free",prefFlavor:f=>"❤ Likes "+cap(f),inCart:n=>`×${n} in cart`,
@@ -282,7 +282,7 @@ const LX={
     offer:(p,f,notSweet,inCart)=>{const lead=f==="gift_novelty"?pick(["For something fun to give, ","A great little surprise — "]):f==="treat_dessert"?pick(["For a little treat, ","Time to spoil yourself — "]):notSweet?pick(["Since you'd rather skip the sugar, ","No sugar rush here — "]):f==="rehydration_electrolytes"?pick(["Since you've been working hard, ","Perfect for bouncing back — "]):f==="fruit_refreshment"?pick(["If you're after something fruity, ","For a bright, fruity pick — "]):pick(["Good call — ","Here's a solid pick — "]);const ask=pick(inCart?["Want me to add it?","Add it to the cart?","Shall I pop it in?"]:["Shall I get one for you?","Want me to grab it?","Sound good?"]);return {pre:lead+p.blurb,ask};}
   },
   zh:{
-    ui:{chat:"聊天机器人",reason:"推理 · 草稿",session:"会话记忆与购物车",prefs:"记住的偏好",cart:"购物车",checkout:"结账",inv:"门店库存",send:"发送",placeholder:"告诉机器人你想要点什么…",empty:"空",noneYet:"暂无",reasonPlaceholder:"机器人每一轮的推理（需求 → 功能 → 约束 → 候选）都会显示在这里。",
+    ui:{chat:"聊天机器人",reason:"推理 · 草稿",session:"会话记忆与购物车",prefs:"记住的偏好",cart:"购物车",checkout:"结账",inv:"门店库存",send:"发送",placeholder:"告诉机器人你想要点什么…",empty:"空",noneYet:"暂无",resetLabel:"重新开始对话",removeLabel:n=>"移除 "+n,composerLabel:"给机器人发消息",reasonPlaceholder:"机器人每一轮的推理（需求 → 功能 → 约束 → 候选）都会显示在这里。",
       skus:n=>`${n} 个 SKU`,tot:(l,u)=>`${l} 项 · ${u} 件`,
       legend:["<b>高亮</b> = 匹配需求","<b>绿框</b> = 已推荐","<b>蓝标</b> = 在购物车","<b>灰色</b> = 已过滤"],
       prefAvoid:"不喜甜",prefLike:"喜欢甜",prefNoCaf:"无咖啡因",prefFlavor:f=>"❤ 喜欢"+(ZH_FLAVOR[f]||f),inCart:n=>`已加 ×${n}`,
@@ -541,9 +541,18 @@ function parseOrdinal(text){
 function negatedTerm(text,term){
   const t=term.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&');
   if(CJK.test(term))return new RegExp("(不要|不想|不用|别|没有|不喜欢|不加|去掉|不放|除了)"+t).test(text);
-  return new RegExp("\\b(no|not|without|dont|hate|avoid|skip|hold|minus|except|but not)\\s+(?:\\w+\\s+){0,2}"+t+"\\w*\\b").test(text);   // \\w* so "no electrolytes" negates the singular "electrolyte"
+  return new RegExp("\\b(no|not|without|dont|hate|avoid|skip|hold|minus|except|but not)\\s+(?:the\\s+|a\\s+|an\\s+)?"+t+"\\w*\\b").test(text);   // allow one article ("not the mango"); \\w* so "no electrolytes" negates singular "electrolyte". Tight window so "no juice just water" doesn't negate "water".
 }
 function anyHasUnnegated(text,list){return list.some(p=>has(text,p)&&!negatedTerm(text,p));}
+// Products the shopper explicitly ruled out ("not the orange one", "no mango", "不要芒果") → their ids, to exclude.
+function negatedProducts(text){
+  const out=[];
+  for(const p of CATALOG){
+    const hay=(p.name+" "+p.flavor+" "+(ZH_NAME[p.id]||"")).toLowerCase();
+    if(DISTINCTIVE.some(d=>hay.includes(d)&&text.includes(d)&&negatedTerm(text,d)))out.push(p.id);
+  }
+  return out;
+}
 function referencedProduct(text,pool){
   const hits=DISTINCTIVE.filter(d=>text.includes(d)&&!negatedTerm(text,d));   // "not the mango" must not resolve to mango
   if(!hits.length)return null;
@@ -647,6 +656,9 @@ function infer(){
   }
   extractInto(need.constraints,need.rawUtterance);
   persistPrefs(need.rawUtterance);
+  // Rule out any product the shopper named negatively ("something fruity but not the orange one") so the ranker
+  // can't fall back to it as the default pick.
+  for(const id of negatedProducts(need.rawUtterance))if(!need.offeredSkus.includes(id))need.offeredSkus.push(id);
   const fns=need.functions;
   const reason={need:need.rawUtterance,scores:need.scores,fns:[...fns],constraints:{...need.constraints},candidates:[],exclusions:[],decision:"",inv:""};
   if(fns.length===0&&need.clarifyCount<clarifyBudget()){reason.decision="ask_clarifying (need unclear)";C.lastReason=reason;C.state="CLARIFY";return {kind:"say",text:L().qIdentify};}
@@ -751,7 +763,7 @@ function infoTopic(text){
   return null;
 }
 // Contentless one-word openers — a re-prompt is cheaper and friendlier than escalating to the model.
-const FILLER=new Set(["yes","yeah","yep","yup","no","nope","nah","maybe","hmm","hm","ok","okay","k","sure","um","uh","huh","eh","meh","嗯","啊","额","呃","哦"]);
+const FILLER=new Set(["yes","yeah","yep","yup","no","nope","nah","maybe","hmm","hmmm","hm","ok","okay","k","sure","um","umm","uh","uhh","erm","er","huh","eh","meh","嗯","啊","额","呃","哦"]);
 function hasNeedSignal(text){
   return Object.keys(scoreFunctions(text)).length>0||anyHas(text,NOT_SWEET)||anyHas(text,YES_SWEET)||anyHas(text,COLD)||anyHas(text,FROZEN)||anyHas(text,NO_CAF)||anyHas(text,GENERIC_DRINK)||anyHas(text,HEALTH_LEAN)||!!referencedProduct(text,CATALOG);
 }
@@ -780,7 +792,11 @@ function metaIntent(text){
   return null;
 }
 
+// Let shoppers order with emoji — 🥤→a drink, 🍦→ice cream, 🎁→a gift, etc. (normalize() would otherwise strip them).
+const EMOJI_MAP={"💧":"water","🚰":"water","🥛":"water","🥤":"a drink","🧃":"juice","🍹":"a drink","🧋":"a drink","⚡":"electrolyte","🔋":"electrolyte","🏃":"electrolyte after a workout","💪":"electrolyte after a workout","🍦":"ice cream","🍨":"ice cream","🥶":"something cold","🎁":"a gift","🎀":"a gift","🧸":"a collectible","⭐":"a collectible","🌟":"a collectible","🍊":"orange juice","🥭":"mango","🍇":"grape"};
+function expandEmoji(s){let out=s;for(const e in EMOJI_MAP)if(out.includes(e))out=out.split(e).join(" "+EMOJI_MAP[e]+" ");return out;}
 function handle(raw){
+  raw=expandEmoji(raw);
   const text=normalize(raw);
   C.history.push({role:"user",text:raw});
   if(anyHas(text,EXIT)){C.state="END";return {kind:"say",text:L().exit(C.cart.length>0),clear:true};}
@@ -806,8 +822,10 @@ function handle(raw){
     if(!hasNeedSignal(text)){
       // A bare quantity ("give me three", "a couple") names no product — ask what, don't guess in the LLM.
       if(parseQty(text)!=null)return {kind:"say",text:L().qIdentify};
-      // A bare filler opener ("yes", "no", "hmm", "ok") carries no need — a quick re-prompt beats spinning up the LLM.
-      if(text&&text.split(" ").every(w=>FILLER.has(w)))return {kind:"say",text:L().qIdentify};
+      // Empty / punctuation-only / all-filler-or-stopword ("...", "???", "a", "ok so like") carries no need —
+      // a quick re-prompt is cheaper and friendlier than spinning up the LLM.
+      const toks=text.split(" ").filter(Boolean);
+      if(!toks.length||toks.every(w=>FILLER.has(w)||STOP.has(w)))return {kind:"say",text:L().qIdentify};
       return {kind:"escalate",raw};   // rules recognise nothing → hand this turn to the LLM
     }
     return beginNeed(raw);
@@ -875,6 +893,13 @@ function handle(raw){
       if(passes(need.currentRec,need.constraints))return {kind:"recommend",rec:need.currentRec,reselect:true};
       need.offeredSkus.push(need.currentRec.id);
       return doRank(freshReason());
+    }
+    // "not the orange one" / "no mango" mid-recommendation → rule THAT item out (before a plain "no" is read as
+    // declining the current pick) and re-rank.
+    const negIds=negatedProducts(text);
+    if(negIds.length){let touched=false;
+      for(const id of negIds)if(!need.offeredSkus.includes(id)){need.offeredSkus.push(id);touched=true;}
+      if(touched)return doRank(freshReason());
     }
     // plain decline
     if(anyHas(text,DECLINE)){
@@ -951,7 +976,7 @@ function renderSession(){
   if(c.notSweet)prefs.push(u.prefAvoid);if(c.wantSweet)prefs.push(u.prefLike);if(c.caffeine===false)prefs.push(u.prefNoCaf);
   if(c.likeFlavor)prefs.push(u.prefFlavor(c.likeFlavor));
   prefsEl.innerHTML=prefs.length?prefs.map(p=>`<span class="pref">${p}</span>`).join(""):`<span class="pref none">${u.noneYet}</span>`;
-  cartEl.innerHTML=C.cart.length?C.cart.map(i=>`<div class="cartitem"><span class="ci">${catVisual(byId(i.id)).i}</span><span class="q">×${i.qty}</span><span class="nm">${esc(pname(byId(i.id)))}</span><button class="rm" data-id="${i.id}" title="remove">✕</button></div>`).join(""):`<div class="cartempty">${u.empty}</div>`;
+  cartEl.innerHTML=C.cart.length?C.cart.map(i=>{const rl=u.removeLabel(pname(byId(i.id)));return `<div class="cartitem"><span class="ci" aria-hidden="true">${catVisual(byId(i.id)).i}</span><span class="q">×${i.qty}</span><span class="nm">${esc(pname(byId(i.id)))}</span><button class="rm" data-id="${i.id}" title="${esc(rl)}" aria-label="${esc(rl)}">✕</button></div>`;}).join(""):`<div class="cartempty">${u.empty}</div>`;
   const units=C.cart.reduce((a,i)=>a+i.qty,0);
   cartTotEl.textContent=C.cart.length?u.tot(C.cart.length,units):"";
   checkoutBtn.disabled=!C.cart.length;
@@ -1162,7 +1187,10 @@ function setLangUI(l,source="auto"){
   document.getElementById("t-inv").textContent=u.inv;
   checkoutBtn.textContent=u.checkout;
   document.getElementById("send").textContent=u.send;
-  inEl.placeholder=u.placeholder;
+  inEl.placeholder=u.placeholder;inEl.setAttribute("aria-label",u.composerLabel);
+  const rb=document.getElementById("reset");rb.title=u.resetLabel;rb.setAttribute("aria-label",u.resetLabel);
+  document.getElementById("lang-en").setAttribute("aria-label","English");
+  document.getElementById("lang-zh").setAttribute("aria-label","中文");
   document.getElementById("legend").innerHTML=u.legend.map(x=>`<span>${x}</span>`).join("");
   chipsEl.innerHTML=L().chips.map(e=>`<span class="chip">${esc(e)}</span>`).join("");
   chipsEl.querySelectorAll(".chip").forEach((c,i)=>c.onclick=()=>{addMsg("user",esc(L().chips[i]));respondRaw(L().chips[i]);});
